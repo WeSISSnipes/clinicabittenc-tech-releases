@@ -1,0 +1,593 @@
+/* Prontuário local — estilo da página principal.
+ *
+ * Toda cor sai de um token definido em :root. O tema escuro redefine só os tokens, e acompanha a
+ * preferência do sistema operacional. Estados seguem UMA linguagem visual em todo o app:
+ *   informação · atenção · erro · ok — cada um com texto, marca (borda forte), fundo e borda.
+ * Só fontes do sistema: a política de segurança do aplicativo (font-src 'none') bloqueia fontes
+ * externas, e o app precisa funcionar sem internet.
+ * O resumo ao paciente (iframe) e o registro exportado têm estilo próprio e não usam este arquivo.
+ */
+
+/* ---------- Tokens ----------
+ * Identidade única com o documento entregue ao paciente: bordô (ação), dourado (detalhe e filete),
+ * neve (fundo) e vinho (texto). O dourado é sempre detalhe — como texto, só o tom escuro
+ * --dourado-texto, que passa no contraste AA. Erro tem o próprio vermelho, separado do bordô.
+ * Escalas: espaço --e1..--e6 (4·8·12·16·24·32) e texto --t-xs..--t-2xl (12·13·14·16·18·22·28). */
+:root {
+  color-scheme: light dark;
+
+  --fundo: #f0efec;
+  --superficie: #ffffff;
+  --superficie-2: #f8f6f3;
+  --texto: #33232a;
+  --texto-suave: #5f4e56;
+  --texto-fraco: #6f5e66;
+  --borda: #e4dfda;
+  --borda-forte: #cfc7c2;
+
+  --acento: #7b4a57;
+  --acento-forte: #693d48;
+  --acento-fundo: #f4ebee;
+  --sobre-acento: #ffffff;
+  --foco: rgba(123, 74, 87, .30);
+
+  --dourado: #a38a5c;
+  --dourado-texto: #7a6338;
+  --dourado-fundo: #f6f0e4;
+
+  --lateral: #2b1d23;
+  --lateral-texto: #d9cdd1;
+  --lateral-marca: #ffffff;
+  --lateral-hover: #3a2a31;
+  --lateral-ativo: #4a3440;
+  --lateral-ativo-borda: #a38a5c;
+
+  --info: #5a4451;
+  --info-marca: #a38a5c;
+  --info-fundo: #f8f3f0;
+  --info-borda: #e8ddd4;
+
+  --atencao: #87521c;
+  --atencao-marca: #c27a2b;
+  --atencao-fundo: #fcf3e6;
+  --atencao-borda: #ecd0ad;
+
+  --erro: #a32118;
+  --erro-marca: #c0392b;
+  --erro-fundo: #fdecea;
+  --erro-borda: #f3c4bf;
+
+  --ok: #2b6e55;
+  --ok-marca: #3f8a6c;
+  --ok-fundo: #e7f3ed;
+  --ok-borda: #c2dfd1;
+
+  --neutro-marca: #a89ba0;
+  --marca-texto: #ecd99a;
+
+  --sombra: 0 1px 2px rgba(51, 35, 42, .06), 0 6px 18px rgba(51, 35, 42, .05);
+  --raio: 14px;
+  --raio-m: 10px;
+  --raio-p: 6px;
+
+  --e1: 4px; --e2: 8px; --e3: 12px; --e4: 16px; --e5: 24px; --e6: 32px;
+  --t-xs: 12px; --t-sm: 13px; --t-base: 14px; --t-md: 16px; --t-lg: 18px; --t-xl: 22px; --t-2xl: 28px;
+
+  --lateral-largura: 252px;
+  --trilho-altura: 0px;
+  --fonte: "Segoe UI", system-ui, -apple-system, "Noto Sans", "Liberation Sans", sans-serif;
+  --fonte-titulo: Georgia, "Palatino Linotype", "DejaVu Serif", serif;
+  --fonte-mono: "Cascadia Mono", Consolas, "DejaVu Sans Mono", ui-monospace, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: #161014;
+    --superficie: #1e161a;
+    --superficie-2: #251b20;
+    --texto: #f1e8eb;
+    --texto-suave: #c2b2b9;
+    --texto-fraco: #a3939b;
+    --borda: #35272d;
+    --borda-forte: #4b3a42;
+
+    --acento: #d9a6b4;
+    --acento-forte: #ebc1cc;
+    --acento-fundo: #3b2630;
+    --sobre-acento: #2a1720;
+    --foco: rgba(217, 166, 180, .38);
+
+    --dourado: #c9ae7c;
+    --dourado-texto: #d9c08f;
+    --dourado-fundo: #2e2618;
+
+    --lateral: #100b0e;
+    --lateral-texto: #bcaeb4;
+    --lateral-marca: #f1e8eb;
+    --lateral-hover: #1b1317;
+    --lateral-ativo: #2a1d23;
+    --lateral-ativo-borda: #c9ae7c;
+
+    --info: #d4c2ca;
+    --info-marca: #c9ae7c;
+    --info-fundo: #241a1f;
+    --info-borda: #3a2c33;
+
+    --atencao: #e6ad69;
+    --atencao-marca: #cf8a39;
+    --atencao-fundo: #2c2112;
+    --atencao-borda: #4f3a1e;
+
+    --erro: #f0939e;
+    --erro-marca: #d45f6d;
+    --erro-fundo: #321a1e;
+    --erro-borda: #5a2e35;
+
+    --ok: #7fc8a6;
+    --ok-marca: #4f9e7d;
+    --ok-fundo: #142a22;
+    --ok-borda: #24493b;
+
+    --neutro-marca: #75676d;
+    --marca-texto: #5f5120;
+
+    --sombra: 0 1px 2px rgba(0, 0, 0, .3);
+  }
+}
+
+/* ---------- Base ---------- */
+* { box-sizing: border-box; }
+html { scroll-padding-top: calc(var(--trilho-altura) + 80px); }
+body {
+  margin: 0;
+  padding-left: var(--lateral-largura);
+  background: var(--fundo);
+  color: var(--texto);
+  font: 14px/1.65 var(--fonte);
+}
+h1, h2, h3, h4 { color: var(--texto); text-wrap: balance; }
+/* Títulos na mesma serifa do documento entregue ao paciente: uma só identidade, do app ao PDF. */
+h1 { font: 600 clamp(24px, 2.4vw, var(--t-2xl))/1.2 var(--fonte-titulo); letter-spacing: -.2px; margin: 8px 0 12px; }
+h2 { font: 600 var(--t-xl)/1.3 var(--fonte-titulo); letter-spacing: -.1px; margin: 6px 0 12px; }
+h3 { font-size: 16px; font-weight: 600; margin: 22px 0 8px; }
+h4 { font-size: 14px; }
+p { color: var(--texto-suave); max-width: 95ch; }
+a { color: var(--acento); }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+mark { background: var(--marca-texto); color: inherit; }
+:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
+
+.eyebrow {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--dourado-texto);
+}
+
+/* O título grande repetido no topo de todo passo ocupava ~170px de tela. Fica só para leitores de
+   tela (a página continua com um h1); a marca do app já está na barra lateral. */
+body > header {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* ---------- Estrutura: barra lateral, trilho de status, conteúdo ---------- */
+body > nav {
+  position: fixed; inset: 0 auto 0 0; z-index: 10;
+  width: var(--lateral-largura);
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 28px 16px 196px; /* o pé da barra é ocupado pelo estado das conexões (.status-rail) */
+  background: var(--lateral);
+  overflow: auto;
+}
+body > nav::before {
+  content: "PRONTUÁRIO LOCAL";
+  color: var(--lateral-marca);
+  font: 600 14px var(--fonte-titulo); letter-spacing: .1em;
+  padding: 0 12px 18px; margin-bottom: 14px;
+  border-bottom: 1px solid var(--lateral-ativo-borda);
+}
+body > nav a {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--lateral-texto);
+  text-decoration: none;
+  font-size: 13px; font-weight: 500;
+  padding: 10px 14px;
+  border: 1px solid transparent; border-radius: var(--raio-m);
+  transition: background .15s, color .15s;
+}
+/* Ícones inline (app/icons.mjs): herdam a cor do texto e nunca aparecem sozinhos. */
+.icone { width: 1.2em; height: 1.2em; flex: none; }
+button[data-icone] { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+/* Pacientes e Ajustes ficam separados das 7 etapas da consulta por um respiro. */
+body > nav a[href="#conexoes"] { margin-bottom: 14px; }
+body > nav a:hover, body > nav a:focus-visible { color: #fff; background: var(--lateral-hover); }
+body > nav a.active { color: #fff; background: var(--lateral-ativo); box-shadow: inset 3px 0 0 var(--lateral-ativo-borda); }
+
+/* Estado das conexões: fica no pé da barra lateral, que já é fixa — sempre à vista, sem gastar uma
+   faixa inteira no topo de cada tela. Em telas estreitas (abaixo) volta a ser uma faixa no topo. */
+.status-rail {
+  position: fixed; left: 0; bottom: 0; z-index: 11;
+  width: var(--lateral-largura);
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+  padding: 12px 16px 16px;
+  background: var(--lateral);
+  border-top: 1px solid var(--lateral-hover);
+}
+.status-version { font: 700 11px var(--fonte-mono); color: var(--lateral-texto); opacity: .7; padding: 0 4px 4px; }
+.status-chip {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  color: var(--lateral-texto); text-decoration: none;
+  font-size: 12px;
+  padding: 5px 6px; border-radius: var(--raio-m);
+}
+.status-chip:hover { background: var(--lateral-hover); }
+.status-chip-label { color: var(--lateral-texto); font-weight: 600; }
+.status-chip .conn-badge { padding: 2px 9px; font-size: 11px; }
+.status-chip-shortcut {
+  justify-content: center; margin-top: 6px;
+  color: var(--acento); font-weight: 700;
+  background: var(--acento-fundo);
+  padding: 7px 12px; border-radius: 20px; white-space: nowrap;
+}
+.status-chip-shortcut:hover { background: var(--acento-fundo); filter: brightness(.97); }
+
+main { max-width: 1240px; margin: 0 auto; padding: 12px 32px 32px; min-width: 0; }
+main > section {
+  background: var(--superficie);
+  border: 1px solid var(--borda); border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 22px 28px; margin: 12px 0;
+}
+main > section[data-step] { scroll-margin-top: calc(var(--trilho-altura) + 72px); }
+#status { margin: 0; padding: 7px 14px; line-height: 1.5; }
+body > footer {
+  text-align: center; font-size: 11px; color: var(--texto-fraco);
+  border-top: 1px solid var(--borda); padding: 22px 30px;
+}
+
+.wizard-bar {
+  position: sticky; top: calc(var(--trilho-altura) + 4px); z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: 10px 0; padding: 6px 12px;
+  background: var(--superficie);
+  border: 1px solid var(--borda); border-radius: var(--raio);
+  box-shadow: var(--sombra);
+}
+.wizard-bar button { min-height: 34px; padding: 5px 14px; }
+.wizard-progress { flex: 1; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--texto); }
+
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 22px; min-width: 0; }
+.grid > * { min-width: 0; }
+#conexoes .grid { align-items: start; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px 10px; margin: 12px 0; }
+
+/* ---------- Formulários ---------- */
+label { display: block; font-size: 13px; font-weight: 600; color: var(--texto); margin: 12px 0; }
+input, textarea, select {
+  display: block; width: 100%; margin-top: 6px;
+  padding: 9px 12px;
+  font: 14px/1.5 var(--fonte);
+  color: var(--texto);
+  background: var(--superficie-2);
+  border: 1px solid var(--borda-forte); border-radius: var(--raio-m);
+  transition: border-color .15s, box-shadow .15s;
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  background: var(--superficie);
+  border-color: var(--acento);
+  box-shadow: 0 0 0 3px var(--foco);
+}
+input::placeholder, textarea::placeholder { color: var(--texto-fraco); font-size: 13px; }
+/* O campo cresce com o texto até 60% da altura da janela — sem a barra de rolagem própria que
+   surgia dentro de uma página que já rola. Só depois desse teto (texto realmente enorme) a
+   rolagem interna volta. O "rows" do HTML vira a altura mínima. */
+textarea { resize: vertical; field-sizing: content; min-height: 4.6em; max-height: 60vh; }
+textarea[rows="3"] { min-height: 5.2em; }
+textarea[rows="4"] { min-height: 6.6em; }
+textarea[rows="5"], textarea[rows="6"] { min-height: 8em; }
+textarea[rows="7"], textarea[rows="12"] { min-height: 11em; }
+input[type=file] { padding: 10px; background: var(--superficie-2); border: 1px dashed var(--borda-forte); }
+input[type=file]::file-selector-button {
+  margin-right: 10px; padding: 7px 10px; cursor: pointer;
+  color: var(--acento); background: var(--superficie);
+  border: 1px solid var(--borda-forte); border-radius: var(--raio-p);
+}
+input[type=checkbox] { accent-color: var(--acento); }
+.check {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 13px; font-weight: 400; line-height: 1.6;
+  padding: 10px 14px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda); border-radius: var(--raio-m);
+}
+.check input { width: 18px; height: 18px; margin-top: 4px; flex-shrink: 0; }
+
+button {
+  min-height: 40px;
+  padding: 9px 16px;
+  font: 600 13px/1.4 var(--fonte);
+  color: var(--sobre-acento);
+  background: var(--acento);
+  border: 1px solid var(--acento); border-radius: var(--raio-m);
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+button:hover:enabled { background: var(--acento-forte); border-color: var(--acento-forte); }
+button.secondary { color: var(--acento); background: var(--superficie); border-color: var(--borda-forte); }
+button.secondary:hover:enabled { background: var(--acento-fundo); border-color: var(--acento); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+/* Ação em andamento: o controle ignora novos cliques (protect() em app.mjs) e mostra que trabalha. */
+[aria-busy="true"] { opacity: .6; cursor: progress; }
+/* Roda um anel pequeno ao lado do rótulo enquanto o botão trabalha: a espera de uma chamada de IA
+   deixa de parecer tela travada. */
+button[aria-busy="true"]::after {
+  content: ""; display: inline-block; width: 13px; height: 13px; margin-left: 8px; vertical-align: -2px;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: girar .8s linear infinite;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+
+/* ---------- Painéis e conteúdo ---------- */
+details {
+  margin: 20px 0; padding: 14px 18px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda); border-radius: var(--raio-m);
+}
+summary { cursor: pointer; color: var(--acento); font-size: 13px; font-weight: 600; }
+details[open] > summary { padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--borda); }
+
+.source {
+  white-space: pre-wrap; overflow: auto;
+  min-height: 80px; max-height: 60vh;
+  padding: 14px 16px;
+  font: 14px/1.75 var(--fonte);
+  background: var(--superficie-2);
+  border: 1px solid var(--borda); border-radius: var(--raio-m);
+}
+/* ---------- Cartões de documento (Etapa 2 e originais da Etapa 1) ----------
+ * Cada documento é uma gaveta: a linha do título mostra, sem abrir, se ele já foi lido e conferido.
+ * O estado vem só do CSS (:has), lendo o texto e a caixa de conferência que já existem — nenhum
+ * script novo, nada é redesenhado, então o que a pessoa digitou nunca é apagado por causa do layout.
+ * Sem texto: cinza · com texto ainda não conferido: âmbar · conferido: verde. */
+.doc-intro { margin: 0 0 6px; }
+.doc-card { margin: 10px 0; padding: 0; background: var(--superficie); border-left: 4px solid var(--neutro-marca); }
+.doc-card > summary {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 11px 16px; margin: 0;
+  list-style: none; cursor: pointer; color: var(--texto); font-size: 14px;
+}
+.doc-card > summary::-webkit-details-marker { display: none; }
+.doc-card > summary::before { content: "▸"; color: var(--texto-fraco); font-size: 12px; transition: transform .15s; }
+.doc-card[open] > summary::before { transform: rotate(90deg); }
+.doc-card[open] > summary { padding-bottom: 11px; margin: 0; border-bottom: 1px solid var(--borda); }
+.doc-titulo { font-weight: 650; }
+.doc-sub { font-size: 12.5px; font-weight: 400; color: var(--texto-fraco); }
+.doc-corpo { padding: 2px 18px 14px; }
+.doc-estado {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+  padding: 3px 12px; border-radius: 20px;
+  color: var(--texto-suave); background: var(--superficie-2); border: 1px solid var(--borda);
+}
+.doc-estado::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--neutro-marca); }
+.doc-estado::after { content: "Sem documento"; }
+.doc-card.opcional .doc-estado::after { content: "Opcional"; }
+.doc-card.origem .doc-estado::after { content: "Aguardando"; }
+.doc-card:has(.doc-texto:not(:placeholder-shown)),
+.doc-card.origem:has(.source:not(:empty)) { border-left-color: var(--atencao-marca); }
+.doc-card:has(.doc-texto:not(:placeholder-shown)) .doc-estado { color: var(--atencao); background: var(--atencao-fundo); border-color: var(--atencao-borda); }
+.doc-card:has(.doc-texto:not(:placeholder-shown)) .doc-estado::before { background: var(--atencao-marca); }
+.doc-card:has(.doc-texto:not(:placeholder-shown)) .doc-estado::after { content: "Lido · falta conferir"; }
+.doc-card.origem:has(.source:not(:empty)) { border-left-color: var(--ok-marca); }
+.doc-card.origem:has(.source:not(:empty)) .doc-estado { color: var(--ok); background: var(--ok-fundo); border-color: var(--ok-borda); }
+.doc-card.origem:has(.source:not(:empty)) .doc-estado::before { background: var(--ok-marca); }
+.doc-card.origem:has(.source:not(:empty)) .doc-estado::after { content: "Carregado"; }
+.doc-card:has(.doc-conf:checked) { border-left-color: var(--ok-marca); }
+.doc-card:has(.doc-conf:checked) .doc-estado { color: var(--ok); background: var(--ok-fundo); border-color: var(--ok-borda); }
+.doc-card:has(.doc-conf:checked) .doc-estado::before { background: var(--ok-marca); }
+.doc-card:has(.doc-conf:checked) .doc-estado::after { content: "Conferido"; }
+.doc-dica { margin: 4px 0 10px; font-size: 12.5px; color: var(--texto-suave); }
+/* Explicação longa: continua inteira, só recolhida — à vista quando a pessoa quiser. */
+details.ajuda { margin: 6px 0; padding: 0; background: none; border: 0; border-radius: 0; }
+.ajuda > summary { font-size: 12.5px; font-weight: 500; color: var(--texto-suave); }
+.ajuda > summary::before { content: "ⓘ  "; color: var(--acento); }
+details.ajuda[open] > summary { padding: 0; margin: 0 0 4px; border: 0; }
+.ajuda > p { margin: 4px 0 8px; font-size: 13px; }
+
+.source h1 { font-size: 22px; }
+.source h2 { font-size: 19px; }
+#sourceCode { font-family: var(--fonte-mono); font-size: 13px; }
+
+/* Pré-visualização do documento: sempre papel branco, como vai ficar impresso. */
+iframe { width: 100%; height: 920px; margin-top: 20px; background: #fff; border: 1px solid var(--borda); border-radius: var(--raio-m); }
+
+.catalog { margin: 14px 0; }
+.catalog-row, .change, .suggestion, .report {
+  margin: 10px 0;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda); border-radius: var(--raio-m);
+}
+/* Catálogo: tipo, nome e estado à vista; data e método numa linha secundária, pequena e cinza. */
+.catalog-row { margin: 6px 0; padding: 8px 14px; color: var(--texto); border-left: 4px solid var(--dourado); }
+.cat-principal { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; }
+.cat-tipo { font-weight: 650; }
+.cat-nome { color: var(--texto-suave); overflow-wrap: anywhere; min-width: 0; }
+.cat-estado {
+  margin-left: auto; font-size: 11.5px; font-weight: 600; white-space: nowrap;
+  padding: 2px 10px; border-radius: 20px;
+  color: var(--ok); background: var(--ok-fundo); border: 1px solid var(--ok-borda);
+}
+.cat-estado.est-pendente { color: var(--texto-suave); background: var(--superficie); border-color: var(--borda); }
+.cat-estado.est-parcial { color: var(--atencao); background: var(--atencao-fundo); border-color: var(--atencao-borda); }
+.cat-estado.est-bloqueado { color: var(--erro); background: var(--erro-fundo); border-color: var(--erro-borda); }
+.cat-meta { display: block; margin-top: 2px; font-size: 12px; color: var(--texto-fraco); }
+.change { padding: 16px; }
+.change pre { max-height: 230px; overflow: auto; }
+.suggestion { padding: 14px; }
+#proposals .change button { margin-top: 10px; }
+.report { padding: 12px 16px; }
+.report h4 { margin: 0 0 8px; font-size: 14px; color: var(--acento); }
+.report ul { margin: 0; padding-left: 20px; font-size: 14px; }
+.report li { margin: 4px 0; }
+.report pre { max-height: 230px; overflow: auto; }
+
+.evidence { font-size: 13px; margin: 6px 0; color: var(--texto-suave); }
+
+.conn-card {
+  min-width: 0; padding: 18px 20px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda); border-radius: var(--raio);
+}
+.conn-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.conn-head h3 { margin: 0; }
+
+/* ---------- Estados: uma linguagem visual só ---------- */
+/* Informação */
+#status, .next-steps {
+  color: var(--info);
+  background: var(--info-fundo);
+  border: 1px solid var(--info-borda); border-left: 3px solid var(--info-marca);
+  border-radius: var(--raio-m);
+  padding: 11px 16px; font-size: 13px;
+}
+.next-steps { margin: 18px 0; max-width: none; }
+.next-steps[hidden] { display: none; }
+.next-steps a { color: var(--acento); font-weight: 600; }
+/* Erro */
+#status.error, .action-feedback {
+  color: var(--erro);
+  background: var(--erro-fundo);
+  border: 1px solid var(--erro-borda); border-left: 3px solid var(--erro-marca);
+  border-radius: var(--raio-m);
+}
+.action-feedback { padding: 14px 16px; font-weight: 600; max-width: none; }
+/* Atenção */
+.report.warn { background: var(--atencao-fundo); border-color: var(--atencao-borda); border-left: 4px solid var(--atencao-marca); }
+.report.warn h4, .report.warn p { color: var(--atencao); }
+.evidence.warn { color: var(--atencao); font-weight: 600; }
+
+.conn-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+  padding: 5px 12px; border-radius: 20px;
+  color: var(--texto-suave); background: var(--superficie);
+  border: 1px solid var(--borda);
+}
+.conn-badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--neutro-marca); }
+.conn-badge.ok { color: var(--ok); background: var(--ok-fundo); border-color: var(--ok-borda); }
+.conn-badge.ok::before { background: var(--ok-marca); }
+.conn-badge.warn { color: var(--atencao); background: var(--atencao-fundo); border-color: var(--atencao-borda); }
+.conn-badge.warn::before { background: var(--atencao-marca); }
+.conn-badge.off { color: var(--texto-suave); background: var(--superficie-2); border-color: var(--borda); }
+.conn-badge.off::before { background: var(--neutro-marca); }
+
+/* ---------- Base revisada: itens da síntese ---------- */
+.pipeline-output {
+  margin: 14px 0; padding: 16px 18px;
+  background: var(--superficie);
+  border: 1px solid var(--borda); border-left: 4px solid var(--ok-marca); border-radius: var(--raio-m);
+}
+.pipeline-output h3 { margin: 0 0 5px; }
+.pipeline-output textarea { min-height: 4.8em; }
+/* Item com citação não localizada na fonte: o cartão inteiro sinaliza, não só a linha da citação. */
+.pipeline-output.nao-confirmado { background: var(--atencao-fundo); border-color: var(--atencao-borda); border-left-color: var(--atencao-marca); }
+
+/* ---------- Pacientes e Histórico ---------- */
+.patient-list { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+.patient-row, .consulta-item {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px;
+  padding: 14px 18px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda); border-radius: var(--raio-m);
+}
+.patient-row { border-left: 4px solid var(--dourado); }
+.patient-row.legado { border-left-color: var(--atencao-marca); }
+.patient-dados { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.patient-nome { font-size: 16px; color: var(--texto); }
+.patient-meta { font-size: 13px; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.patient-meta.warn { color: var(--atencao); font-weight: 600; }
+.patient-row .actions, .consulta-item .actions { margin: 0; }
+.linha-do-tempo { list-style: none; padding: 0; margin: 18px 0; display: flex; flex-direction: column; gap: 8px; }
+.historico-cabeca { margin-top: 18px; }
+
+/* ---------- Telas menores ---------- */
+@media (max-width: 1150px) {
+  :root { --lateral-largura: 200px; }
+  body > nav { padding: 24px 10px; }
+  body > nav::before { font-size: 13px; }
+  .status-rail { padding: 10px 10px 12px; }
+  main { padding: 12px 24px 30px; }
+  main > section { padding: 24px; }
+}
+@media (max-width: 800px) {
+  :root { --trilho-altura: 46px; --nav-movel: 54px; }
+  body { padding-left: 0; }
+  /* Trilho de status numa linha só, rolando para o lado, em vez de ocupar três linhas. */
+  .status-rail {
+    position: static; width: auto;
+    flex-direction: row; align-items: center; gap: 8px; flex-wrap: nowrap; overflow-x: auto;
+    padding: 6px 12px; background: var(--superficie); border-top: 0; border-bottom: 1px solid var(--borda);
+  }
+  .status-version { color: var(--texto-fraco); opacity: 1; padding: 5px 4px; }
+  .status-chip { flex-direction: row; align-items: center; gap: 7px; }
+  .status-chip, .status-chip-label { color: var(--texto); }
+  .status-chip:hover { background: var(--superficie-2); }
+  .status-chip-label { color: var(--texto-suave); }
+  .status-chip, .status-chip-shortcut { flex-shrink: 0; }
+  .status-chip-shortcut { margin: 0 0 0 8px; }
+  body > nav {
+    position: sticky; top: 0; inset: auto; width: auto; height: var(--nav-movel);
+    flex-direction: row; align-items: center; gap: 4px;
+    padding: 8px 12px; overflow-x: auto;
+  }
+  body > nav::before { display: none; }
+  body > nav a { white-space: nowrap; padding: 8px 12px; }
+  body > nav a[href="#conexoes"] { margin-bottom: 0; margin-right: 10px; }
+  main { margin: 0; padding: 12px 12px 28px; }
+  main > section { padding: 20px 16px; }
+  main > section[data-step] { scroll-margin-top: calc(var(--nav-movel) + 76px); }
+  html { scroll-padding-top: calc(var(--nav-movel) + 76px); }
+  /* A barra de etapas gruda logo abaixo do menu, que também gruda no topo. */
+  .wizard-bar { top: var(--nav-movel); padding: 8px 10px; margin: 12px 0; }
+  .wizard-bar button { min-height: 36px; padding: 7px 12px; }
+  .grid { grid-template-columns: 1fr; gap: 0; }
+  .section-head { flex-wrap: wrap; }
+  .actions button { max-width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } button[aria-busy="true"]::after { animation: none; } }
+
+/* Impressão: sempre em papel claro, sem a moldura do aplicativo. */
+@media print {
+  :root { color-scheme: light; --fundo: #fff; --superficie: #fff; --superficie-2: #fff; --texto: #1d313b; --texto-suave: #444; --borda: #ccc; }
+  body { padding: 0; background: #fff; }
+  body > nav, .status-rail, .wizard-bar { display: none; }
+  main { max-width: none; padding: 0; }
+  main > section { box-shadow: none; }
+}
+
+/* Modo avançado (Ajustes): sem ele, o Registro e os botões de exemplo fictício ficam fora da vista. */
+body:not([data-avancado]) .so-avancado { display: none !important; }
+
+/* ---------- Cartão Principal do Gravador 1 Clique ---------- */
+#scribeHeroCard {
+  background: linear-gradient(145deg, var(--superficie) 0%, var(--superficie-2) 100%);
+  box-shadow: 0 8px 28px rgba(51, 35, 42, .08);
+  padding: 24px 28px;
+}
+#scribeStartBtn {
+  font-size: 14px;
+  padding: 11px 22px;
+  box-shadow: 0 4px 12px rgba(123, 74, 87, .25);
+}
+#scribeQuickResult {
+  background: var(--ok-fundo);
+  color: var(--ok);
+  border-color: var(--ok-borda);
+  border-left-color: var(--ok-marca);
+}

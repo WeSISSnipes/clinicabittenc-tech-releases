@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Prontuário local</title>
+<link rel="stylesheet" href="/app/app.css"></head>
+<body>
+<div class="status-rail">
+<div style="display:flex; align-items:center; justify-content:space-between; gap:0.4rem;">
+  <span id="appVersion" class="status-version" title="Versão do aplicativo — para conferir junto com quem desenvolve"></span>
+  <button id="updateAppBtn" type="button" class="secondary" style="padding:0.2rem 0.55rem; font-size:0.75rem;" title="Buscar e instalar última versão do GitHub sem precisar baixar arquivo .zip">🔄 Atualizar app</button>
+</div>
+<a href="#conexoes" class="status-chip"><span class="status-chip-label">Síntese</span><span id="hubConnection" class="conn-badge" role="status">Verificando…</span></a>
+<a href="#conexoes" class="status-chip"><span class="status-chip-label">Redigir com IA</span><span id="aiBadge" class="conn-badge off" role="status">Não configurado</span></a>
+<a href="#resumo" class="status-chip status-chip-shortcut">Ir direto ao Resumo →</a>
+</div>
+<header><div><span class="eyebrow">PRONTUÁRIO · APLICATIVO LOCAL</span><h1>Prontuário local</h1><p>Organize o atendimento com revisão médica em cada etapa.</p></div></header>
+<nav aria-label="Etapas"><a href="#inicio" data-icone="pacientes">Pacientes</a><a href="#conexoes" data-icone="ajustes">Ajustes</a><a href="#entrada" data-icone="entradas">1 · Dados da consulta</a><a href="#apoio" data-icone="documentos">2 · Exames e documentos</a><a href="#pipeline" data-icone="conferir">3 · Resumo para conferir</a><a href="#bloco" data-icone="prontuario">4 · Texto do prontuário</a><a href="#clinica" class="so-avancado" data-icone="registro">5 · Registro</a><a href="#resumo" data-icone="paciente">6 · Resumo ao paciente</a><a href="#sessao" data-icone="guardar">7 · Concluir e guardar</a></nav>
+<main>
+<div id="status" role="status" aria-live="polite">Carregue as fontes, revise a síntese e gere as entregas.</div>
+<div class="wizard-bar"><button id="wizardBack" type="button" class="secondary" data-icone="seta-esquerda">Voltar</button><span id="wizardProgress" class="wizard-progress" role="status" aria-live="polite"></span><button id="wizardNext" type="button" data-icone="seta-direita" data-icone-lado="depois">Avançar</button></div>
+<section id="inicio" data-step="0">
+<div class="conn-card" id="scribeHeroCard" style="margin-bottom: 1.5rem; border: 2px solid var(--dourado, #A38A5C);">
+<div class="section-head" style="margin-bottom: 0.5rem;">
+  <div>
+    <span class="eyebrow">GRAVADOR E TRANSCRIÇÃO EM 1 CLIQUE · GEMINI FLASH</span>
+    <h2 style="margin: 0.2rem 0;">Gravar Consulta (Médico/Nutri + Paciente)</h2>
+  </div>
+  <div class="actions">
+    <span id="scribeGeminiBadge" class="conn-badge warn" role="status">Verificando Gemini…</span>
+    <button id="scribeToggleKeyBtn" type="button" class="secondary">Chave Gemini</button>
+  </div>
+</div>
+<p style="margin-top: 0;">Escolha o paciente da sua pasta do OneDrive (ou digite um novo), aperte <strong>Iniciar Gravação</strong> e, ao encerrar, o aplicativo transcreve a conversa separando quem falou, monta o prontuário e o resumo pós-consulta e <strong>já salva os arquivos direto na pasta do paciente</strong>.</p>
+<div id="scribeKeyBox" class="next-steps" hidden style="margin-bottom: 1rem;">
+  <div class="grid">
+    <label>Chave da API do Google Gemini (<code>AIza...</code> — Google AI Studio)
+      <input id="scribeKeyInput" type="password" autocomplete="off" placeholder="AIzaSy...">
+    </label>
+  </div>
+  <div class="actions">
+    <button id="scribeSaveKeyBtn" type="button">Salvar e validar chave do Gemini</button>
+    <button id="scribeTestKeyBtn" type="button" class="secondary">Testar chave atual</button>
+  </div>
+  <p id="scribeKeyVerifyNotice" class="evidence" style="margin: 0.4rem 0 0 0;">A chave é testada direto no Google antes de liberar a gravação, para você nunca correr risco de gravar uma consulta com chave inválida.</p>
+</div>
+<div class="grid">
+  <label>Paciente (busca nas pastas do OneDrive ou cria pasta nova)
+    <input id="scribePatientName" list="scribePatientsDatalist" autocomplete="off" placeholder="Digite ou selecione o nome completo do paciente...">
+    <datalist id="scribePatientsDatalist"></datalist>
+  </label>
+  <label>Ou importe um áudio já gravado (.webm, .mp3, .m4a, .wav)
+    <input id="scribeAudioFile" type="file" accept="audio/*">
+  </label>
+</div>
+<div class="actions" style="margin-top: 0.75rem; align-items: center;">
+  <button id="scribeStartBtn" type="button">🎙 Iniciar Gravação da Consulta</button>
+  <button id="scribePauseBtn" type="button" class="secondary" hidden>Pausar</button>
+  <button id="scribeStopBtn" type="button" hidden style="background: #9e2a2b; color: #fff;">⏹ Encerrar e Gerar Tudo (1 Clique)</button>
+  <span id="scribeRecordingStatus" hidden style="font-weight: 600; color: #9e2a2b;">🔴 Gravando · <span id="scribeTimer">00:00</span></span>
+</div>
+<audio id="scribeAudioPlayer" controls hidden style="width: 100%; margin-top: 0.75rem;"></audio>
+<div id="scribeAudioActions" class="actions" hidden style="margin-top: 0.6rem; align-items: center;">
+  <button id="scribeRetryBtn" type="button" class="secondary">🔄 Tentar Processar Áudio Novamente</button>
+  <button id="scribeDownloadAudioBtn" type="button" class="secondary">💾 Baixar Áudio Gravado (.wav)</button>
+  <span id="scribeAudioBackupInfo" class="evidence" style="margin: 0;"></span>
+</div>
+<div id="scribeQuickResult" class="next-steps" hidden style="margin-top: 0.75rem;"></div>
+<details id="scribeResultDrawer" style="margin-top: 0.75rem;" hidden>
+  <summary><strong>Ver Transcrição Diarizada, Prontuário e PDF Pós-Consulta</strong></summary>
+  <div class="actions" style="margin: 0.75rem 0;">
+    <button id="scribeCopyBlocoBtn" type="button">📋 Copiar Bloco para o Gestão DS</button>
+    <button id="scribePrintResumoBtn" type="button" class="secondary">📄 Imprimir / Salvar PDF Pós-Consulta</button>
+    <button id="scribeDownloadResumoBtn" type="button" class="secondary">💾 Baixar HTML Pós-Consulta</button>
+    <button id="scribeCopyTranscricaoBtn" type="button" class="secondary">📋 Copiar Transcrição</button>
+    <button id="scribeCopyWhatsappBtn" type="button" class="secondary">💬 Copiar WhatsApp</button>
+    <a href="#resumo" class="secondary" style="padding: 0.45rem 0.9rem; text-decoration: none; border-radius: 6px; border: 1px solid currentColor;">Editar / Grifar Resumo →</a>
+  </div>
+  <div class="grid">
+    <label>Transcrição Completa ([MM:SS] Profissional vs Paciente)
+      <textarea id="scribeTranscriptText" rows="10"></textarea>
+    </label>
+    <label>Mensagem Rápida para WhatsApp
+      <textarea id="scribeWhatsappText" rows="10"></textarea>
+    </label>
+  </div>
+</details>
+</div>
+<div id="vistaPacientes">
+<div class="section-head"><div><span class="eyebrow">PACIENTES</span><h2>Pacientes</h2></div><button id="inicioNovaConsulta" type="button">Nova consulta</button></div>
+<p>Cada pessoa é identificada pelo nome e pela data de nascimento. Tudo fica na pasta de dados escolhida em Ajustes.</p>
+<p id="patientsFolderAviso" class="next-steps" hidden>Nenhuma pasta de dados configurada, então ainda não há histórico para mostrar. <a href="#conexoes">Configurar a pasta em Ajustes →</a></p>
+<div id="primeirosPassos" class="next-steps" hidden></div>
+<label>Buscar paciente<input id="patientSearchInicio" autocomplete="off" placeholder="Nome ou parte dele"></label>
+<div id="patientListInicio" class="patient-list"></div>
+</div>
+<div id="vistaHistorico" hidden>
+<button id="historicoVoltar" type="button" class="secondary">← Todos os pacientes</button>
+<div class="section-head historico-cabeca"><div><span class="eyebrow">HISTÓRICO</span><h2 id="historicoNome"></h2><p id="historicoIdentificacao" class="evidence"></p></div><button id="historicoNovaConsulta" type="button">Consulta de hoje</button></div>
+<div id="historicoLegado" class="report warn" hidden>
+<h4>Data de nascimento não registrada</h4>
+<p>Estas consultas foram salvas antes de o histórico usar dois identificadores. Registrar a data de nascimento separa esta pessoa de qualquer homônimo. Nenhuma consulta é alterada ou perdida.</p>
+<div class="grid"><label>Nome, como deve aparecer<input id="legadoNome" autocomplete="off"></label><label>Data de nascimento<input id="legadoNascimento" type="date"></label></div>
+<div class="actions"><button id="legadoRegistrar" type="button">Registrar data de nascimento</button></div>
+</div>
+<ol id="historicoConsultas" class="linha-do-tempo"></ol>
+</div>
+</section>
+<section id="conexoes" data-step="1"><span class="eyebrow">AJUSTES</span><h2>Ajustes</h2>
+<p>Configurações feitas uma vez: as duas conexões de IA e a pasta onde o histórico de pacientes fica guardado.</p>
+<h3>Conexões de IA</h3>
+<p>Duas conexões independentes, cada uma com sua própria chave e seu próprio consentimento. Nenhuma envia nada sem a caixa de autorização marcada aqui. O status de cada uma fica sempre visível no topo da tela.</p>
+<div class="grid">
+<div class="conn-card">
+<div class="conn-head"><h3>Resumo clínico por IA</h3></div>
+<p>Gera o resumo para conferir e os dois textos (mensagem ao paciente e resumo clínico) a partir do prontuário, da transcrição e dos exames extraídos, em <a href="#pipeline">Resumo para conferir</a>. A chave fica só neste computador e só é enviada à Anthropic. Ela é guardada com a proteção de credenciais do sistema operacional quando este computador a oferece; o aviso logo abaixo do campo da chave diz se é o caso aqui.</p>
+<div class="next-steps"><strong>O que sai do computador quando a IA é usada:</strong> o prontuário inteiro (com o histórico), a transcrição e os exames conferidos, <strong>incluindo nome e data de nascimento</strong>, vão para o provedor da IA (a Anthropic, ou o que estiver escolhido em "Redigir com IA"). Nada é anonimizado. Com a IA desligada, nada disso sai.</div>
+<div id="hubApiKeyBox" hidden>
+<p id="hubCofreNota" class="evidence" hidden></p>
+<label>Chave da Anthropic (<code>ANTHROPIC_API_KEY</code>)<input id="hubApiKeyInput" type="password" autocomplete="off" placeholder="sk-ant-..."></label>
+<div class="actions"><button id="hubApiKeySave" type="button" class="secondary">Salvar chave</button><button id="hubApiKeyForget" type="button" class="secondary">Esquecer chave salva</button></div>
+</div>
+<p id="hubApiKeyEnvNote" class="evidence">Rodando fora do aplicativo instalado (<code>node server.mjs</code> direto), a chave continua vindo do <code>.env</code> local, como sempre.</p>
+<label class="check"><input id="hubConsent" type="checkbox">Autorizo enviar as fontes desta consulta à Anthropic para gerar a base e as entregas.</label>
+</div>
+<div class="conn-card">
+<div class="conn-head"><h3>Redigir com IA</h3></div>
+<p>Redige seções do <a href="#bloco">bloco do prontuário</a> a partir das fontes aprovadas e, quando o PDF de <a href="#apoio">exames</a> não tem camada de texto, lê-o visualmente de forma automática. Chave própria, digitada aqui.</p>
+<p class="next-steps"><strong>Fica salva neste navegador (não na sessão exportada)</strong> para não precisar redigitar a cada consulta — em texto legível, então evite em computador compartilhado. Use "Esquecer chave salva" para apagar.</p>
+<div class="grid"><label>Provedor<select id="aiProvider"></select></label><label>Endereço da API<input id="aiEndpoint" autocomplete="off" placeholder="https://..."></label></div>
+<div class="grid"><label>Modelo<input id="aiModel" autocomplete="off"></label><label>Chave da API<input id="aiKey" type="password" autocomplete="off"></label></div>
+<button id="aiForgetKey" type="button" class="secondary">Esquecer chave salva</button>
+<p id="aiDestino" class="evidence"></p>
+<label class="check"><input id="aiPdfOk" type="checkbox" data-config>Este provedor aceita PDF como anexo.</label>
+<p id="aiPdfNota" class="evidence"></p>
+<label class="check"><input id="aiConsent" type="checkbox">Autorizo enviar as fontes aprovadas desta consulta ao provedor externo.</label>
+</div>
+</div>
+<h3>Pasta do histórico de pacientes</h3>
+<p>Onde cada consulta salva fica guardada, uma pasta por paciente. Escolha uma pasta privada, fora da pasta do aplicativo. <strong>Sem criptografia nesta versão:</strong> quem tem acesso à pasta lê tudo — inclusive quem tiver acesso à sua conta da nuvem, se a pasta estiver no OneDrive ou no Google Drive.</p>
+<div class="next-steps"><strong>Se a pasta estiver no OneDrive, Google Drive ou similar:</strong> use <strong>um computador por vez</strong>. Feche o aplicativo no outro antes de abrir aqui e espere o ícone de sincronizado antes de fechar o notebook. Se depois de sincronizar uma consulta parecer faltando, procure na pasta do paciente por um arquivo com o nome do outro computador no final: é a outra versão dela.</div>
+<div class="grid"><label>Pasta de dados (caminho completo)<input id="patientsFolderPath" autocomplete="off" placeholder="Windows: C:\ProntuarioLocal\pacientes — Linux: /home/usuario/ProntuarioLocal"></label></div>
+<div class="actions"><button id="setPatientsFolder" class="secondary">Usar esta pasta</button></div>
+<p id="patientsFolderStatus" class="evidence">Verificando…</p>
+<h3>Atualização rápida do aplicativo</h3>
+<p>Verifica e instala melhorias publicadas no GitHub em 1 clique, sem precisar baixar ou extrair arquivos manualmente.</p>
+<div class="actions"><button id="settingsUpdateAppBtn" type="button" class="secondary">🔄 Verificar e instalar atualização do GitHub</button></div>
+<p id="settingsUpdateStatus" class="evidence"></p>
+<h3>Avançado</h3>
+<label class="check"><input id="modoAvancado" type="checkbox" data-config>Mostrar o Registro do atendimento (etapa opcional) e os botões de exemplo fictício.</label>
+<p class="evidence">Para o uso normal não é preciso: o texto da etapa "Texto do prontuário" é o que se cola no sistema da clínica. Os exemplos fictícios <strong>substituem o que estiver preenchido</strong>, por isso ficam escondidos.</p>
+</section>
+<section id="entrada" data-step="2"><div class="section-head"><div><span class="eyebrow">ETAPA 1 · DADOS DA CONSULTA</span><h2>Dados da consulta</h2></div><button id="demo" class="secondary so-avancado">Carregar exemplo fictício</button></div>
+<p>Os arquivos ficam na memória do aplicativo enquanto a consulta está aberta. Guarde a consulta antes de fechar, no passo "Concluir e guardar".</p>
+<p id="entradasPastaAviso" class="next-steps" hidden><strong>Ainda não há pasta de dados configurada:</strong> sem ela esta consulta não poderá ser guardada e se perde ao fechar. <a href="#conexoes">Configurar em Ajustes →</a></p>
+<div class="grid"><label>HTML do prontuário anterior<input id="htmlFile" type="file" accept=".html,.htm"></label><label>Transcrição atual em texto UTF-8<input id="textFile" type="file" accept=".txt"></label></div>
+<div class="grid"><label>Ou cole o código HTML do prontuário<textarea id="pastedHtml" rows="7" spellcheck="false" placeholder="Cole aqui o HTML, incluindo marcações como &lt;p&gt; e &lt;strong&gt;."></textarea><button id="useHtmlPasted" class="secondary">Usar este HTML colado</button></label><label>Ou cole o texto da transcrição<textarea id="pastedTranscript" rows="7" spellcheck="false" placeholder="Cole aqui a transcrição completa, sem resumir."></textarea><div class="actions"><button id="useTranscriptPasted" class="secondary">Usar esta transcrição colada</button><button id="scribeProcessPastedBtn" type="button">✨ Gerar Tudo com Gemini Flash (1 Clique)</button></div></label></div>
+<p>Cada campo — arquivo ou texto colado — é independente: use só o HTML, só a transcrição, ou os dois, na ordem que preferir. Ao confirmar um campo, o texto recebido fica preservado nos originais abaixo sem mexer no outro campo.</p>
+<div id="nextSteps" class="next-steps" hidden><strong>Entradas recebidas.</strong><p>O HTML recebido já contém a consulta atual e todo o histórico. O aplicativo atualiza a entrada do dia; não acrescenta outra. A síntese é gerada pela Anthropic somente após sua autorização e exige revisão.</p><ol><li>Confirme identificação, data e modalidade nos campos abaixo.</li><li>Anexe exames e bioimpedância em <a href="#apoio">Exames extraídos</a>, se houver.</li><li>Prepare e revise as propostas em <a href="#rascunhos">Rascunhos e pendências</a>.</li><li>Confira os limites do HTML e prepare a conferência em <a href="#clinica">Registro do atendimento</a>.</li><li>Preencha o <a href="#resumo">Resumo da consulta</a> e monte o documento.</li></ol></div>
+<div class="grid"><label>Nome do paciente<input id="patient" autocomplete="off"></label><label>Data de nascimento<input id="birthDate" type="date"></label><label>Data do atendimento<input id="date" type="date"></label><label>Modalidade<select id="modality"><option value="">Selecionar</option><option>Avulso</option><option>Plano</option></select></label><label>Tipo interno<select id="internalType"><option>Nova consulta</option><option>Primeira consulta</option><option>Encontro</option></select></label></div>
+<label class="check"><input id="identityConfirmed" type="checkbox">Conferi que as duas entradas pertencem à mesma pessoa e confirmei os dados do atendimento.</label></section>
+<section id="fontes" data-step="2"><span class="eyebrow">ETAPA 1 · ARQUIVOS RECEBIDOS</span><h2>Arquivos desta consulta</h2><details class="doc-card origem"><summary><span class="doc-titulo">Prontuário anterior</span><span class="doc-sub">como foi recebido, sem scripts</span><span class="doc-estado"></span></summary><div class="doc-corpo"><div id="safePreview" class="source"></div></div></details>
+<details class="doc-card origem"><summary><span class="doc-titulo">Transcrição original</span><span class="doc-sub">texto integral, sem edição</span><span class="doc-estado"></span></summary><div class="doc-corpo"><pre id="originalText" class="source"></pre></div></details>
+<h3>Catálogo de fontes desta consulta</h3><p>Origem, data, método e estado de leitura de cada documento. Fica somente nesta sessão privada.</p><div id="catalog" class="catalog"></div>
+<details><summary>Histórico adicional opcional, sem mesclar</summary><label>Arquivo de referência UTF-8<input id="extraFile" type="file" accept=".txt,.md,.html"></label><div id="extras"></div></details>
+<details><summary>Revisão linguística opcional</summary><p>Elaboração clínica permanece manual. A simulação apenas sugere remover espaços duplicados; não usa IA ou rede.</p><button id="simulate" class="secondary">Simular sugestões locais</button><div id="suggestions"></div><label>Cópia de trabalho para revisão manual<textarea id="workingText" rows="7"></textarea></label><label class="check"><input id="reviewApproved" type="checkbox">Comparei a cópia com o original e aprovo seu uso como referência.</label><p id="reviewState">Use o original até aprovar uma cópia.</p></details>
+</section>
+<section id="apoio" data-step="3"><span class="eyebrow">ETAPA 2 · EXAMES E DOCUMENTOS</span><h2>Exames e documentos</h2>
+<p class="doc-intro">Anexe o que houver desta consulta. Cada documento mostra, na própria linha, se já foi lido e conferido.</p>
+
+<details class="doc-card" open>
+<summary><span class="doc-titulo">Exames laboratoriais</span><span class="doc-sub">PDF ou texto do laudo</span><span class="doc-estado"></span></summary>
+<div class="doc-corpo">
+<details class="ajuda"><summary>Como a leitura funciona</summary><p>O PDF é lido primeiro neste computador, sem envio a nenhum serviço: não existe OCR local. Se a leitura local não encontrar camada de texto (documento digitalizado) e um provedor com leitura visual já estiver configurado e autorizado em <a href="#conexoes">Minhas conexões de IA</a>, o envio acontece automaticamente; sem isso, a mensagem explica o próximo passo. Documento protegido ou ilegível nunca é tratado como resultado normal. Pode haver mais de um PDF de exames por consulta: selecione vários de uma vez ou anexe um de cada vez — cada leitura é somada ao texto abaixo, sem apagar as anteriores.</p></details>
+<div class="grid"><label>PDF de exames (pode escolher vários)<input id="examFile" type="file" accept=".pdf" multiple></label><label>Ou cole o texto do laudo<textarea id="examPaste" rows="6" spellcheck="false" placeholder="Cole aqui o texto do laudo, uma linha por resultado."></textarea></label></div>
+<div class="actions"><button id="readExams" class="secondary">Ler documento de exames</button><button id="demoExams" class="secondary so-avancado">Usar exames fictícios</button><button id="aiReadExams" class="secondary">Pedir para a IA ler este PDF</button></div>
+<p class="doc-dica">Confira o texto extraído abaixo. Depois de conferido, ele pode compor o resumo para conferir em <a href="#pipeline">Resumo para conferir</a>.</p>
+<div id="examReport"></div>
+<label>Exames extraídos, em texto corrido, para conferência e edição<textarea id="examsProse" class="doc-texto" rows="5" placeholder="Preenchido após a leitura. Revise antes de incorporar ao prontuário."></textarea></label>
+<label class="check"><input id="examsApproved" class="doc-conf" type="checkbox">Conferi analito, valor, unidade, referência, data e origem de cada resultado no documento original.</label>
+<details class="ajuda"><summary>Como o texto entra no prontuário</summary><p>O texto aprovado entra no prontuário em texto corrido, dentro da evolução do dia. Não é gerado um PDF separado de exames. Reprocessar o mesmo documento reescreve a entrada do dia; não acrescenta outra.</p></details>
+</div>
+</details>
+
+<details class="doc-card" open>
+<summary><span class="doc-titulo">Bioimpedância</span><span class="doc-sub">relatório da consulta de hoje</span><span class="doc-estado"></span></summary>
+<div class="doc-corpo">
+<details class="ajuda"><summary>Sobre relatórios e links</summary><p><strong>O aplicativo não baixa relatórios.</strong> Exporte os PDFs no site e anexe abaixo, ou cole os dados. Informar o link não traz nenhum dado: ele é apenas reconhecido e guardado nesta sessão. Evite colar links de pessoas reais em qualquer registro compartilhado.</p></details>
+<label>Link do relatório, opcional — só para referência<input id="biaLink" autocomplete="off" placeholder="https://…"></label>
+<div id="biaNotice"></div>
+<div class="grid"><label>PDF do relatório<input id="biaFile" type="file" accept=".pdf"></label><label>Ou cole os dados<textarea id="biaPaste" rows="4" spellcheck="false" placeholder="Uma linha por medida. Exemplo: Peso: 82,4 kg"></textarea></label></div>
+<div class="actions"><button id="readBia" class="secondary">Ler bioimpedância</button><button id="demoBia" class="secondary so-avancado">Usar relatório fictício</button><button id="aiReadBia" class="secondary">Pedir para a IA ler este PDF</button></div>
+<details class="ajuda"><summary>Quando usar "Pedir para a IA ler este PDF"</summary><p>Muitos relatórios mostram massa gorda, massa magra e massa muscular só como medidor ou anel colorido — a leitura local só decifra texto de verdade e não vê esses desenhos. Use "Pedir para a IA ler este PDF" quando a lista abaixo vier incompleta; exige provedor com leitura visual configurado e autorizado em <a href="#conexoes">Minhas conexões de IA</a>.</p></details>
+<div id="biaReport"></div>
+<label>Bioimpedância em texto corrido<textarea id="biaProse" class="doc-texto" rows="3" placeholder="Preenchido após a leitura. Revise antes de incorporar ao prontuário."></textarea></label>
+<label class="check"><input id="biaApproved" class="doc-conf" type="checkbox">Confirmei identidade, data e método do relatório. Não comparei estes valores com densitometria.</label>
+</div>
+</details>
+
+<details class="doc-card">
+<summary><span class="doc-titulo">Evolução e meta</span><span class="doc-sub">Série das avaliações anteriores e alvo para a próxima consulta.</span><span class="doc-estado"></span></summary>
+<div class="doc-corpo">
+<div class="grid"><label>PDF de evolução/meta<input id="targetFile" type="file" accept=".pdf"></label><label>Ou cole os dados<textarea id="targetPaste" rows="4" spellcheck="false" placeholder="Uma linha por data. Exemplo: 01/08/2026 - 84,0 kg - 32,0 %"></textarea></label></div>
+<div class="actions"><button id="readTarget" class="secondary">Ler evolução e meta</button><button id="aiReadTarget" class="secondary">Pedir para a IA ler este PDF</button></div>
+<details class="ajuda"><summary>Sobre a tabela de metas e os gráficos</summary><p>A tabela de metas e os gráficos de tendência (peso, % gordura) também costumam ser desenho, não texto. A leitura por IA preenche a tabela acima e, quando houver gráfico, uma leitura aproximada dele em "Interpretação do relatório" — sempre para conferência, nunca aprovada sozinha.</p></details>
+<div id="targetReport"></div>
+<label>Evolução e meta em texto corrido<textarea id="targetProse" class="doc-texto" rows="3" placeholder="Preenchido após a leitura. Revise antes de incorporar ao prontuário."></textarea></label>
+<label class="check"><input id="targetApproved" class="doc-conf" type="checkbox">Conferi as datas e os valores da série e a meta registrada.</label>
+</div>
+</details>
+
+<details class="doc-card opcional">
+<summary><span class="doc-titulo">Interpretação do relatório</span><span class="doc-sub">opcional · leitura de terceiro</span><span class="doc-estado"></span></summary>
+<div class="doc-corpo">
+<p class="next-steps"><strong>Este texto é a leitura do serviço de bioimpedância, não a avaliação de quem atendeu.</strong> Serve para facilitar a leitura dos dois documentos acima, mas exige conferência. Se for incorporado, entra no prontuário com a autoria escrita, para que ninguém depois o confunda com conclusão da profissional.</p>
+<div class="grid"><label>PDF da interpretação<input id="interpFile" type="file" accept=".pdf"></label><label>Ou cole o texto<textarea id="interpPaste" rows="4" spellcheck="false"></textarea></label></div>
+<div class="actions"><button id="readInterp" class="secondary">Ler interpretação</button></div>
+<div id="interpReport"></div>
+<label>Trecho a incorporar, se houver — deixe vazio para não registrar<textarea id="interpProse" class="doc-texto" rows="4" placeholder="Cole ou edite aqui apenas o que você conferiu e quer registrar."></textarea></label>
+<label>Fonte a creditar no prontuário<input id="interpFonte" value="Galileu" autocomplete="off"></label>
+<label class="check"><input id="interpApproved" class="doc-conf" type="checkbox">Conferi este texto contra os dados medidos e assumo o que será registrado, ciente de que a leitura é de terceiro.</label>
+</div>
+</details>
+</section>
+<section id="pipeline" data-step="4"><span class="eyebrow">ETAPA 3 · RESUMO PARA CONFERIR</span><h2>Resumo clínico para conferir</h2>
+<p>A IA recebe o prontuário completo, a transcrição e o campo de exames extraídos. Os PDFs são lidos localmente. Confira as fontes antes de gerar; a autorização é configurada em <a href="#conexoes">Minhas conexões de IA</a>.</p>
+<div class="actions"><button id="hubGenerate">Gerar síntese clínica</button><button id="hubSaveBase" class="secondary" disabled>Salvar base para revisão</button></div>
+<p id="hubState" role="status" aria-live="polite"></p><div id="hubBase"></div>
+<label class="check"><input id="hubApprove" type="checkbox" disabled>Conferi cada item e sua origem. Aprovo esta versão da base para gerar as entregas.</label>
+<h2>Textos gerados a partir do resumo conferido</h2>
+<p>Mensagem e resumo são gerados independentemente. Revise cada texto antes de copiar ou salvar. Alterar a base exige nova aprovação e novas entregas.</p>
+<button id="hubDeliver" disabled>Gerar mensagem e resumo</button>
+<div class="grid"><div><h3>Mensagem ao paciente</h3><p id="hubStatus_mensagem" role="status"></p><label>Texto editável<textarea id="hubText_mensagem" rows="12"></textarea></label><label class="check"><input type="checkbox" id="hubFinal_mensagem" disabled>Conferi esta entrega e minhas edições.</label><div class="actions"><button id="hubRetry_mensagem" class="secondary" disabled>Gerar somente mensagem</button><button id="hubCopy_mensagem" disabled>Copiar</button><button id="hubSave_mensagem" class="secondary" disabled>Salvar TXT</button></div></div><div><h3>Resumo clínico</h3><p id="hubStatus_resumo" role="status"></p><label>Texto editável<textarea id="hubText_resumo" rows="12"></textarea></label><label class="check"><input type="checkbox" id="hubFinal_resumo" disabled>Conferi esta entrega e minhas edições.</label><div class="actions"><button id="hubRetry_resumo" class="secondary" disabled>Gerar somente resumo</button><button id="hubCopy_resumo" disabled>Copiar</button><button id="hubSave_resumo" class="secondary" disabled>Salvar TXT</button></div></div></div>
+</section>
+<section id="rascunhos" data-step="4"><span class="eyebrow">ETAPA 3 · SUGESTÕES PARA CONFERIR</span><h2>Sugestões e pendências</h2>
+<p>Cada proposta mostra de onde veio. Nada entra nos campos sem aceitação explícita. Menção não equivale a prescrição, e nenhuma fonte tem prioridade automática sobre outra.</p>
+<button id="buildDraft" class="secondary">Preparar rascunhos a partir das fontes</button>
+<h3>Pendências</h3><div id="pendencies"></div>
+<h3>Propostas</h3><div id="proposals"></div>
+</section>
+<section id="bloco" data-step="5"><span class="eyebrow">ETAPA 4 · TEXTO PARA O PRONTUÁRIO</span><h2>Texto para colar no sistema da clínica</h2>
+<p>Este é o texto que vai para o prontuário da clínica, no formato usado pela profissional. Seção vazia não aparece no código gerado: ausência de dado não vira frase negativa.</p>
+<div class="actions"><button id="seedBlock" class="secondary">Preencher a partir do que já foi conferido</button></div>
+<details id="aiPanel"><summary>Redigir com IA — opcional</summary>
+<p>As fontes <strong>aprovadas</strong> são enviadas para o provedor escolhido, pela internet. Nada é enviado sem você clicar. Provedor, chave e autorização são configurados em <a href="#conexoes">Minhas conexões de IA</a>.</p>
+<p class="next-steps">O texto devolvido é rascunho: ele preenche as seções, você revisa tudo, e o que estiver incerto deve permanecer em “Pontos que precisam ser confirmados”.</p>
+<div class="actions"><button id="aiWrite" class="secondary">Redigir seções com IA</button></div>
+<div id="aiReport"></div>
+</details>
+
+<p class="next-steps">O preenchimento automático usa somente extrações aprovadas e pendências já visíveis. Nada é inventado, e você edita tudo antes de gerar o código.</p>
+<div class="grid"><label>Queixa/contexto atual<textarea id="bloco_queixa" rows="3" placeholder="Texto corrido. Uma linha por parágrafo."></textarea></label><label>Alimentação e rotina<textarea id="bloco_alimentacao" rows="4" placeholder="Uma linha por item."></textarea></label><label>Atividade física<textarea id="bloco_atividade" rows="4" placeholder="Uma linha por item."></textarea></label><label>Sintomas e intestino<textarea id="bloco_sintomas" rows="4" placeholder="Uma linha por item."></textarea></label><label>Suplementos/medicações relatados<textarea id="bloco_suplementos" rows="4" placeholder="Uma linha por item."></textarea></label><label>Antropometria e composição corporal<textarea id="bloco_antropometria" rows="4" placeholder="Preenchido pelas extrações aprovadas."></textarea></label><label>Exames laboratoriais comentados<textarea id="bloco_laboratorio" rows="4" placeholder="Preenchido pelos exames aprovados."></textarea></label><label>Avaliação/conduta discutida<textarea id="bloco_conduta" rows="4" placeholder="Somente decisões registradas na consulta."></textarea></label><label>Próximo atendimento<textarea id="bloco_proximo" rows="3" placeholder="Data e horário conforme combinado."></textarea></label><label>Pontos que precisam ser confirmados<textarea id="bloco_confirmar" rows="4" placeholder="Preenchido pelas pendências. Revise e complete."></textarea></label></div>
+<label>Título do bloco<input id="bloco_heading" value="1. Prontuário clínico" autocomplete="off"></label>
+<div class="actions"><button id="buildBlock">Gerar código do bloco</button><button id="copyBlock" class="secondary" disabled>Copiar código</button><button id="downloadBlock" class="secondary" disabled>Salvar como arquivo</button></div>
+<label>Código gerado, pronto para colar<textarea id="blockCode" rows="12" readonly spellcheck="false"></textarea></label>
+<h3>Prévia</h3><div id="blockPreview" class="source"></div>
+<label class="check"><input id="blockApproved" type="checkbox">Revisei o bloco inteiro, inclusive números, medicações e os pontos a confirmar.</label>
+</section>
+<section id="clinica" data-step="6"><span class="eyebrow">ETAPA 5 · REVISÃO E GRAVAÇÃO</span><h2>Registro do atendimento</h2><p>Preencha somente informações confirmadas. Campos de atualização vazios preservam o que já existe.</p>
+<p class="next-steps">Estes campos são preenchidos pela profissional; não serão completados a partir da transcrição. Se ainda não confirmou pessoa, data e modalidade, volte a <a href="#entrada">Entradas da consulta</a>. O botão de salvar será liberado após preparar e aprovar a conferência.</p>
+<details id="boundaries"><summary>Delimitar e conferir regiões do HTML</summary><p id="regionState">Importe o HTML.</p><p>Para formato desconhecido, selecione no código somente o conteúdo do campo atual. Não inclua evoluções anteriores. Selecione a <strong>evolução atual</strong> se o atendimento do dia já estiver escrito no HTML — ela será substituída pela versão revisada. Use o ponto de inserção apenas quando a entrada do dia ainda não existir. Marcar os dois duplicaria a consulta e é recusado.</p><label>Código original, somente leitura<textarea id="sourceCode" readonly rows="12" spellcheck="false"></textarea></label><div class="actions"><button data-region="identificacao" class="secondary">Marcar identificação</button><button data-region="hipoteses" class="secondary">Marcar hipóteses</button><button data-region="conduta" class="secondary">Marcar conduta</button><button data-region="current" class="secondary">Marcar evolução atual</button><button data-region="insertion" class="secondary">Marcar ponto de inserção</button></div><pre id="regionDetails"></pre></details>
+<label class="check"><input id="regionsConfirmed" type="checkbox">Conferi os limites: nenhuma evolução anterior será substituída e a entrada do dia é única.</label>
+<div class="grid"><label>Em uso de:<textarea id="medications" rows="3" placeholder="Informações confirmadas ou dúvida explicitamente registrada"></textarea></label><label>Evolução do dia<textarea id="evolution" rows="5"></textarea></label></div>
+<div class="grid"><label>Identificação a atualizar<textarea id="identificacao" rows="3"></textarea></label><label>Hipóteses diagnósticas confirmadas<textarea id="hipoteses" rows="3"></textarea></label><label>Conduta atual confirmada<textarea id="conduta" rows="3"></textarea></label></div>
+<button id="prepare" disabled>Preparar conferência do HTML</button><p id="prepareNota" class="evidence"></p><div id="changes"></div>
+<label class="check"><input id="recordApproved" type="checkbox" disabled>Revisei as alterações e aprovo este HTML atualizado.</label>
+<label>Nome oficial do HTML atualizado (opcional)<input id="recordFilename" placeholder="prontuario_identificador_gestaods.html"></label><button id="exportRecord" disabled>Salvar HTML atualizado</button>
+</section>
+<section id="resumo" data-step="7"><span class="eyebrow">ETAPA 6 · DOCUMENTO AO PACIENTE</span><h2>Resumo ao paciente</h2><p>Escreva em linguagem de paciente, a partir das decisões confirmadas.</p>
+<button id="fillSummaryAI" disabled type="button" class="secondary">Preencher com IA a partir da base aprovada</button><p id="fillSummaryAINota" class="evidence"></p>
+<label>Nomenclatura ao paciente<select id="patientType"><option>Nova consulta</option><option>Primeira consulta</option><option>Revisão da primeira consulta</option><option>Nova consulta — Programa de Acompanhamento Metabólico</option></select></label>
+<div class="grid"><label>Abertura<textarea id="fraseconexao" rows="3"></textarea></label><label>Pontos que merecem atenção<textarea id="pontosatencao" rows="3"></textarea></label><label>Medicação<textarea id="medicacao" rows="3"></textarea></label><label>Exames solicitados<textarea id="exames" rows="3"></textarea></label><label>Próximo passo / agendamento<textarea id="agendamento" rows="3"></textarea></label><label>Encerramento<textarea id="frasefinal" rows="3"></textarea></label></div>
+<details><summary>Texto comercial opcional</summary><label class="check"><input id="commercialEnabled" type="checkbox">Confirmo primeira consulta com obesidade/emagrecimento e autorizo incluir o texto abaixo.</label><label>Texto aprovado pela responsável<textarea id="obsobesidade" rows="4"></textarea></label></details>
+<button id="buildSummary" disabled>Montar resumo para editar e grifar</button><p id="buildSummaryNota" class="evidence"></p><p>Selecionar um trecho dentro do resumo permite grifar. Salvar incorpora o conteúdo no HTML.</p>
+<iframe id="summaryFrame" title="Resumo editável da consulta" sandbox="allow-same-origin allow-modals" hidden></iframe>
+<label class="check"><input id="summaryApproved" type="checkbox" disabled>Revisei a versão exibida, inclusive números, medicamentos, grifos e agendamento.</label>
+<div class="actions"><button id="exportSummary" disabled>Salvar resumo HTML</button><button id="printSummary" disabled class="secondary">Imprimir versão final / PDF</button></div><p id="pdfHelp">Salve o HTML e imprima a mesma versão como PDF. Confira cortes, quebras e encerramento. Entregue HTML e PDF juntos.</p>
+</section>
+<section id="sessao" data-step="8"><span class="eyebrow">ETAPA 7 · CONCLUIR E GUARDAR</span><h2>Concluir e guardar a consulta</h2><div class="actions"><button id="saveSession">Salvar sessão com originais</button><button id="downloadOriginalHtml" class="secondary">Baixar HTML original</button><button id="downloadOriginalText" class="secondary">Baixar transcrição original</button></div><label>Reabrir sessão salva<input id="sessionFile" type="file" accept=".json"></label><button id="newSession" class="secondary">Limpar e iniciar outra consulta</button><p>Não há banco, conta ou backup automático. Os originais não são editados pelo aplicativo. Sessões e downloads contêm dados privados e precisam de proteção no computador.</p>
+<h3>Histórico de pacientes neste computador — opcional</h3>
+<p>Guarda esta consulta na pasta configurada em <a href="#conexoes">Ajustes</a>, junto com as anteriores da mesma pessoa, identificada pelo nome e pela data de nascimento preenchidos em <a href="#entrada">Entradas</a>. Sem banco e <strong>sem criptografia nesta versão</strong>. Para usar o histórico em outro computador, aponte-o para a mesma pasta sincronizada — sempre um computador por vez — ou copie a pasta inteira.</p>
+<div class="actions"><button id="saveToHistory" disabled>Salvar esta consulta no histórico</button><button id="verHistoricoDaPessoa" type="button" class="secondary" disabled>Ver histórico desta pessoa</button></div>
+<p id="saveToHistoryNota" class="evidence"></p>
+</section>
+</main><footer>Prontuário local · Apoio à consulta: o registro oficial é o do sistema da clínica · Os dados ficam na pasta que você escolheu e só vão a um provedor de IA quando você a usa · Não substitui a conferência médica</footer><script type="module" src="/app/app.mjs"></script></body></html>

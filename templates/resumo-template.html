@@ -1,0 +1,600 @@
+<!--
+  RESUMO PÓS-CONSULTA — Dra. Isabela Bittencourt
+  Template mestre — identidade visual de referência (ver docs/CONTRATO.md, resumo).
+  Substitui o antigo plano de PDF/AcroForm (10/09/2026): esta versão é HTML editável,
+  com grifo de trecho nativo, fontes reais (não Helvetica) e exportação a PDF via
+  "Imprimir" no navegador. Redesenhado em 12/09/2026.
+
+  COMO USAR (por consulta):
+  1. Copie este arquivo para pacientes/<slug>/resumo_consulta_<slug>_<AAAA-MM-DD>.html
+  2. Preencha nome e data no cabeçalho (.patient-row). Tipo de consulta: Primeira
+     consulta / Encontro / Nova consulta / Nova consulta — Programa de Acompanhamento
+     Metabólico (ver docs/CONTRATO.md; confirmar nomenclatura ao paciente, nunca "retorno").
+  3. Substitua o texto de cada elemento [data-field] pelo rascunho real da consulta —
+     nunca deixe o placeholder entre colchetes.
+  4. Inclua o bloco condicional "obsobesidade" só quando for primeira consulta E o
+     caso envolver obesidade/emagrecimento; caso contrário, apague a <section> inteira.
+  5. Troque STORAGE_KEY (no <script>, no fim do arquivo) para algo único da paciente,
+     ex. 'resumo-<slug>-<AAAA-MM-DD>' — evita misturar rascunho entre pacientes caso
+     dois arquivos sejam abertos no mesmo navegador.
+  6. Opcional: já grife (<mark class="grifo">...</mark>) o número mais importante de
+     pontosatencao e/ou frasefinal — a Bela ajusta ou remove com um clique.
+-->
+<title>Resumo Pós-Consulta</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prata&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --neve:#F0EFEC;
+    --perola:#DDDCD7;
+    --cinza:#A5A49F;
+    --bordo:#7B4A57;
+    --bordo-hover:#693D48;
+    --vinho:#33232A;
+    --vinho-2:#241a1f;
+    --dourado:#A38A5C;
+    --backdrop:#E3E0D8;
+    --grifo:rgba(163,138,92,.4);
+    --grifo-strong:rgba(163,138,92,.7);
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    background:var(--backdrop);
+    color:var(--vinho);
+    font-family:'EB Garamond', Georgia, 'Times New Roman', serif;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  ::selection{ background:rgba(123,74,87,.25); color:inherit; }
+
+  button{ font:inherit; }
+
+  /* ---------- app chrome (tool, not document) ---------- */
+  .app-chrome{
+    position:sticky;
+    top:0;
+    z-index:30;
+    background:rgba(227,224,216,.88);
+    backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--perola);
+  }
+  .toolbar{
+    max-width:900px;
+    margin:0 auto;
+    padding:14px 24px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  .toolbar-group{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+  .mode-toggle{
+    display:inline-flex;
+    background:var(--perola);
+    border-radius:999px;
+    padding:3px;
+    gap:2px;
+  }
+  .mode-toggle button{
+    border:none;
+    background:transparent;
+    cursor:pointer;
+    font-family:'Jost',sans-serif;
+    font-size:12px;
+    font-weight:500;
+    letter-spacing:.07em;
+    text-transform:uppercase;
+    padding:8px 18px;
+    border-radius:999px;
+    color:var(--vinho);
+  }
+  .mode-toggle button[aria-pressed="true"]{ background:var(--vinho); color:var(--neve); }
+  .mode-toggle button:focus-visible,
+  .btn-primary:focus-visible,
+  .link-muted:focus-visible,
+  [contenteditable]:focus-visible{ outline:2px solid var(--dourado); outline-offset:2px; }
+
+  .btn-primary{
+    font-family:'Jost',sans-serif;
+    font-size:12px;
+    font-weight:500;
+    letter-spacing:.07em;
+    text-transform:uppercase;
+    background:var(--bordo);
+    color:var(--neve);
+    border:none;
+    border-radius:999px;
+    padding:10px 20px;
+    cursor:pointer;
+  }
+  .btn-primary:hover{ background:var(--bordo-hover); }
+
+  .link-muted{
+    font-family:'Jost',sans-serif;
+    font-size:11.5px;
+    letter-spacing:.03em;
+    color:var(--cinza);
+    text-decoration:underline;
+    text-underline-offset:2px;
+    cursor:pointer;
+    background:none;
+    border:none;
+    padding:4px 2px;
+  }
+  .link-muted:hover{ color:var(--bordo); }
+
+  .mode-caption{
+    max-width:900px;
+    margin:0 auto;
+    padding:0 24px 12px;
+    font-family:'Jost',sans-serif;
+    font-size:11.5px;
+    letter-spacing:.05em;
+    color:var(--cinza);
+    text-align:center;
+  }
+
+  /* ---------- the letter itself ---------- */
+  .sheet{
+    width:min(700px, calc(100% - 32px));
+    margin:40px auto 90px;
+    background:var(--neve);
+    border:1px solid var(--perola);
+    border-radius:3px;
+    box-shadow:0 30px 60px -30px rgba(51,35,42,.4), 0 2px 10px rgba(51,35,42,.06);
+    padding:52px 56px 44px;
+  }
+
+  .doc-header{ text-align:center; }
+  .doc-name{
+    font-family:'Prata', Georgia, serif;
+    font-size:27px;
+    font-weight:400;
+    color:var(--vinho);
+    margin:0 0 10px;
+  }
+  .eyebrow{
+    font-family:'Jost',sans-serif;
+    font-size:10.5px;
+    font-weight:500;
+    letter-spacing:.15em;
+    text-transform:uppercase;
+    color:var(--cinza);
+  }
+  .gold-rule{
+    height:1px;
+    background:var(--dourado);
+    opacity:.75;
+    margin:18px 0 0;
+  }
+
+  .patient-row{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:baseline;
+    margin:26px 0 22px;
+    font-family:'Jost',sans-serif;
+    column-gap:12px;
+    row-gap:4px;
+  }
+  .patient-name{ font-weight:600; color:var(--vinho); font-size:14.5px; }
+  .patient-date{ color:var(--cinza); font-size:12.5px; margin-left:auto; text-align:right; }
+
+  .frase{
+    font-style:italic;
+    color:var(--bordo);
+    text-align:center;
+    font-size:17px;
+    line-height:1.65;
+    margin:0 auto;
+    max-width:94%;
+  }
+  .frase-conexao{ margin-bottom:30px; }
+  .frase-final{ margin:30px auto 20px; }
+
+  .section-label{
+    font-family:'Jost',sans-serif;
+    font-weight:600;
+    font-size:11.5px;
+    letter-spacing:.13em;
+    text-transform:uppercase;
+    color:var(--bordo);
+    margin:0 0 9px;
+  }
+
+  .block{ margin-bottom:18px; }
+  .block:last-of-type{ margin-bottom:0; }
+
+  .card{
+    background:var(--neve);
+    border:1px solid var(--perola);
+    border-radius:5px;
+    padding:16px 19px;
+  }
+  .card p{
+    margin:0;
+    font-size:15.5px;
+    line-height:1.68;
+    color:var(--vinho);
+  }
+
+  .divider{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin:32px 0 18px;
+  }
+  .divider::before, .divider::after{
+    content:'';
+    flex:1;
+    height:1px;
+    background:var(--perola);
+  }
+  .divider span{
+    font-family:'Jost',sans-serif;
+    font-size:11px;
+    letter-spacing:.15em;
+    text-transform:uppercase;
+    color:var(--cinza);
+    white-space:nowrap;
+  }
+
+  .agendamento-box{
+    background:var(--vinho);
+    color:var(--neve);
+    border-radius:5px;
+    padding:18px 21px;
+    margin:22px 0 0;
+  }
+  .agendamento-box .section-label{ color:var(--dourado); margin-bottom:8px; }
+  .agendamento-box p{ margin:0; font-size:15px; line-height:1.6; color:var(--neve); }
+  .agendamento-box mark.grifo{ background:rgba(163,138,92,.6); color:var(--vinho); }
+
+  .signature{
+    text-align:center;
+    font-family:'Jost',sans-serif;
+    font-weight:600;
+    font-size:11.5px;
+    letter-spacing:.12em;
+    color:var(--vinho);
+    text-transform:uppercase;
+    margin-top:6px;
+  }
+
+  /* ---------- editable affordance ---------- */
+  .field{ position:relative; }
+  [contenteditable="true"]{
+    outline:none;
+    border-radius:3px;
+    transition:background-color .15s ease, box-shadow .15s ease;
+  }
+  body.edit-mode .field::before{
+    content:'editar';
+    position:absolute;
+    top:-17px;
+    right:1px;
+    font-family:'Jost',sans-serif;
+    font-size:9px;
+    font-weight:500;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--cinza);
+    opacity:0;
+    transition:opacity .15s ease;
+    pointer-events:none;
+  }
+  body.edit-mode .field:hover::before{ opacity:1; }
+  body.edit-mode [contenteditable="true"]:hover{ background:rgba(165,164,159,.13); }
+  body.edit-mode [contenteditable="true"]:focus{
+    background:rgba(163,138,92,.09);
+    box-shadow:0 0 0 2px rgba(163,138,92,.4);
+  }
+  .agendamento-box.field::before{ color:var(--dourado); opacity:0; }
+  body.edit-mode .agendamento-box [contenteditable="true"]:hover{ background:rgba(240,239,236,.1); }
+  body.edit-mode .agendamento-box [contenteditable="true"]:focus{
+    background:rgba(240,239,236,.14);
+    box-shadow:0 0 0 2px rgba(163,138,92,.55);
+  }
+
+  mark.grifo{
+    background:var(--grifo);
+    color:inherit;
+    border-radius:2px;
+    padding:0.5px 2px;
+    -webkit-box-decoration-break:clone;
+    box-decoration-break:clone;
+  }
+  body.edit-mode mark.grifo{ cursor:pointer; }
+  body.edit-mode mark.grifo:hover{ background:var(--grifo-strong); }
+
+  /* ---------- floating grifar toolbar ---------- */
+  .grifo-toolbar{
+    position:fixed;
+    z-index:50;
+    transform:translate(-50%,-100%);
+    background:var(--vinho);
+    color:var(--neve);
+    font-family:'Jost',sans-serif;
+    font-size:12px;
+    font-weight:500;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    padding:8px 16px;
+    border:none;
+    border-radius:20px;
+    box-shadow:0 10px 24px rgba(51,35,42,.4);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .grifo-toolbar:hover{ background:var(--vinho-2); }
+  .grifo-toolbar[hidden]{ display:none; }
+
+  @media (max-width:640px){
+    .sheet{ padding:34px 22px 32px; margin:24px auto 70px; }
+    .patient-row{ flex-direction:column; align-items:flex-start; gap:4px; }
+    .toolbar{ justify-content:center; }
+  }
+
+  @media print{
+    body{ background:#fff; }
+    .app-chrome, .grifo-toolbar, .mode-caption{ display:none !important; }
+    .sheet{ box-shadow:none; border:none; margin:0 auto; width:100%; max-width:640px; padding:0; }
+    .field::before{ display:none !important; }
+    .block, .card, .agendamento-box, .doc-header{ break-inside:avoid; }
+    *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *{ transition:none !important; }
+  }
+</style>
+
+<div class="app-chrome">
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <div class="mode-toggle" role="group" aria-label="Modo de exibição">
+        <button type="button" id="modeEdit" aria-pressed="true">Editar</button>
+        <button type="button" id="modeView" aria-pressed="false">Visualizar</button>
+      </div>
+    </div>
+    <div class="toolbar-group">
+      <button type="button" class="btn-primary" id="printBtn">Imprimir / Salvar PDF</button>
+      <button type="button" class="link-muted" id="resetBtn">Restaurar exemplo</button>
+    </div>
+  </div>
+  <div class="mode-caption" id="modeCaption"></div>
+</div>
+
+<main class="sheet">
+  <header class="doc-header">
+    <div class="doc-name">Dra. Isabela Bittencourt</div>
+    <div class="eyebrow">Endocrinologia e Metabologia &nbsp;·&nbsp; CRM/SP 175492 &nbsp;·&nbsp; RQE 110731</div>
+  </header>
+  <div class="gold-rule"></div>
+
+  <div class="patient-row">
+    <span class="patient-name">[Nome da paciente]</span>
+    <span class="patient-date">[DD/MM/AAAA] &nbsp;·&nbsp; [Tipo de consulta]</span>
+  </div>
+
+  <p class="frase frase-conexao field">
+    <span data-field="fraseconexao" contenteditable="true">[Frase afetuosa de abertura: "Oi, (nome/apelido)!" + boas-vindas institucionais só quando for primeira consulta + frase-ponte para os próximos passos, em 2–3 linhas.]</span>
+  </p>
+
+  <section class="block">
+    <div class="section-label">Pontos que merecem nossa atenção</div>
+    <div class="card field">
+      <p data-field="pontosatencao" contenteditable="true">[Os pontos desta consulta que mais chamam atenção e pedem cuidado — exames, medidas, sintomas — cada um com uma frase simples do porquê tratar aquilo importa. Linguagem de paciente, não de prontuário. Se fizer sentido, já grife (&lt;mark class="grifo"&gt;) o número mais importante.]</p>
+    </div>
+  </section>
+
+  <div class="divider"><span>Próximos passos</span></div>
+
+  <section class="block">
+    <div class="section-label">Medicação</div>
+    <div class="card field">
+      <p data-field="medicacao" contenteditable="true">[Medicação prescrita: nome, dose, como usar — igual ao explicado na consulta. Sem prescrição nova nesta consulta: "Nenhuma medicação nova nesta consulta."]</p>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="section-label">Exames solicitados</div>
+    <div class="card field">
+      <p data-field="exames" contenteditable="true">[Exames laboratoriais/imagem solicitados e a finalidade de cada um. Sem exame novo: "Nenhum exame novo solicitado nesta consulta."]</p>
+    </div>
+  </section>
+
+  <div class="agendamento-box field">
+    <div class="section-label">Próximo passo</div>
+    <p data-field="agendamento" contenteditable="true">[Consulta agendada para DD/MM/AAAA, horário. Ou, quando for a revisão da primeira consulta: "Agendada revisão da primeira consulta em DD/MM/AAAA." Nunca usar "retorno" ou "encontro" — termos internos.]</p>
+  </div>
+
+  <!-- BLOCO CONDICIONAL — obsobesidade: incluir esta <section> somente quando for
+       PRIMEIRA CONSULTA e o caso envolver obesidade/emagrecimento. Fora disso, apague
+       a section inteira (da abertura "<section" até o "</section>" correspondente). -->
+  <section class="block">
+    <div class="section-label">Sobre o acompanhamento</div>
+    <div class="card field">
+      <p data-field="obsobesidade" contenteditable="true">Uma consulta isolada raramente traz o resultado que você busca — o que realmente faz diferença é acompanhar a evolução de perto, ajustar o que for preciso ao longo do caminho e, quando há medicação envolvida, observar seus efeitos ao longo do tempo. Constância é o que garante o melhor aproveitamento do tratamento. Por isso, esta primeira consulta inclui uma consulta de revisão gratuita dentro de 30 dias — o tempo para ajustarmos juntas os primeiros passos; as consultas seguintes já são atendimentos independentes entre si, cada uma com o seu próprio valor. Se em algum momento você quiser suporte contínuo entre as consultas, o Programa de Acompanhamento Metabólico foi criado exatamente para isso — posso te contar mais quando fizer sentido para você.</p>
+    </div>
+  </section>
+  <!-- FIM BLOCO CONDICIONAL — obsobesidade -->
+
+  <p class="frase frase-final field">
+    <span data-field="frasefinal" contenteditable="true">[Frase de conexão de encerramento, tom pessoal — cita algo específico da evolução desta pessoa. Pode ter o tom da "Dra. Bela"; a assinatura formal abaixo continua "Dra. Isabela Bittencourt".]</span>
+  </p>
+
+  <div class="signature">Dra. Isabela Bittencourt</div>
+</main>
+
+<button type="button" class="grifo-toolbar" id="grifoToolbar" hidden></button>
+
+<script>
+(function(){
+  var STORAGE_KEY = 'resumo-[slug]-[AAAA-MM-DD]'; // trocar por paciente, ex. 'resumo-paciente-a-AAAA-MM-DD'
+  var body = document.body;
+  var fields = Array.prototype.slice.call(document.querySelectorAll('[data-field]'));
+  var editBtn = document.getElementById('modeEdit');
+  var viewBtn = document.getElementById('modeView');
+  var printBtn = document.getElementById('printBtn');
+  var resetBtn = document.getElementById('resetBtn');
+  var toolbar = document.getElementById('grifoToolbar');
+  var caption = document.getElementById('modeCaption');
+
+  var mode = 'edit';
+  var pendingRange = null;
+  var pendingMark = null;
+
+  function applyMode(){
+    var editing = mode === 'edit';
+    body.classList.toggle('edit-mode', editing);
+    fields.forEach(function(f){ f.setAttribute('contenteditable', editing ? 'true' : 'false'); });
+    editBtn.setAttribute('aria-pressed', String(editing));
+    viewBtn.setAttribute('aria-pressed', String(!editing));
+    caption.textContent = editing
+      ? 'Modo edição — clique no texto para ajustar · selecione um trecho para grifar'
+      : 'Modo visualização — assim a paciente recebe';
+    if(!editing) hideToolbar();
+  }
+
+  editBtn.addEventListener('click', function(){ mode = 'edit'; applyMode(); });
+  viewBtn.addEventListener('click', function(){ mode = 'view'; applyMode(); });
+  printBtn.addEventListener('click', function(){ window.print(); });
+
+  function saveState(){
+    try{
+      var data = {};
+      fields.forEach(function(f){ data[f.getAttribute('data-field')] = f.innerHTML; });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }catch(e){}
+  }
+
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return;
+      var data = JSON.parse(raw);
+      fields.forEach(function(f){
+        var key = f.getAttribute('data-field');
+        if(data[key] != null) f.innerHTML = data[key];
+      });
+    }catch(e){}
+  }
+
+  resetBtn.addEventListener('click', function(){
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    location.reload();
+  });
+
+  fields.forEach(function(f){
+    f.addEventListener('input', debounce(saveState, 400));
+    f.addEventListener('blur', saveState);
+  });
+
+  function debounce(fn, ms){
+    var t;
+    return function(){
+      var args = arguments;
+      clearTimeout(t);
+      t = setTimeout(function(){ fn.apply(null, args); }, ms);
+    };
+  }
+
+  function hideToolbar(){
+    toolbar.hidden = true;
+    pendingRange = null;
+    pendingMark = null;
+  }
+
+  function getSelectionInfo(){
+    var sel = window.getSelection();
+    if(!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+    var range = sel.getRangeAt(0);
+    var node = range.commonAncestorContainer;
+    var el = node.nodeType === 1 ? node : node.parentElement;
+    if(!el) return null;
+    var editableRoot = el.closest('[contenteditable="true"]');
+    if(!editableRoot) return null;
+    return { sel: sel, range: range, el: el };
+  }
+
+  function showToolbarForSelection(range, existingMark){
+    var rect = range.getBoundingClientRect();
+    if(rect.width === 0 && rect.height === 0){ hideToolbar(); return; }
+    toolbar.textContent = existingMark ? 'Remover grifo' : 'Grifar';
+    toolbar.style.left = (rect.left + rect.width / 2) + 'px';
+    toolbar.style.top = (rect.top - 10) + 'px';
+    toolbar.hidden = false;
+    pendingRange = range;
+    pendingMark = existingMark || null;
+  }
+
+  function wrapSelection(range){
+    var mark = document.createElement('mark');
+    mark.className = 'grifo';
+    try{
+      range.surroundContents(mark);
+    }catch(e){
+      var frag = range.extractContents();
+      mark.appendChild(frag);
+      range.insertNode(mark);
+    }
+    saveState();
+  }
+
+  function unwrapMark(mark){
+    var parent = mark.parentNode;
+    while(mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+    parent.removeChild(mark);
+    parent.normalize();
+    saveState();
+  }
+
+  toolbar.addEventListener('mousedown', function(e){ e.preventDefault(); });
+  toolbar.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(pendingMark){ unwrapMark(pendingMark); }
+    else if(pendingRange){ wrapSelection(pendingRange); }
+    hideToolbar();
+    window.getSelection().removeAllRanges();
+  });
+
+  document.addEventListener('mouseup', function(e){
+    if(mode !== 'edit') return;
+    if(toolbar.contains(e.target)) return;
+    var clickedMark = e.target.closest ? e.target.closest('mark.grifo') : null;
+    var info = getSelectionInfo();
+    if(!info && clickedMark){
+      unwrapMark(clickedMark);
+      return;
+    }
+    if(!info){ hideToolbar(); return; }
+    var insideMark = info.el.closest('mark.grifo');
+    showToolbarForSelection(info.range, insideMark);
+  });
+
+  document.addEventListener('keyup', function(e){
+    if(mode !== 'edit') return;
+    if(e.key === 'Shift' || e.key.indexOf('Arrow') === 0){
+      var info = getSelectionInfo();
+      if(!info){ hideToolbar(); return; }
+      var insideMark = info.el.closest('mark.grifo');
+      showToolbarForSelection(info.range, insideMark);
+    }
+  });
+
+  document.addEventListener('mousedown', function(e){
+    if(!toolbar.hidden && !toolbar.contains(e.target)) hideToolbar();
+  });
+
+  loadState();
+  applyMode();
+})();
+</script>

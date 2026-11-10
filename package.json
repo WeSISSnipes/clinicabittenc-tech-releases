@@ -1,0 +1,80 @@
+{
+  "name": "prontuario-local",
+  "version": "0.13.0",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.mjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test tests/core.test.mjs",
+    "test:browser": "node tests/browser.mjs",
+    "electron:start": "electron .",
+    "dist": "electron-builder --win",
+    "dist:zip": "electron-builder --win zip --x64",
+    "release": "electron-builder --win --publish always",
+    "publicar": "node scripts/publicar-atualizacao.mjs"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9",
+    "pdfjs-dist": "4.10.38"
+  },
+  "devDependencies": {
+    "electron": "44.3.0",
+    "electron-builder": "26.15.3",
+    "playwright": "^1.63.0"
+  },
+  "build": {
+    "appId": "com.prontuariolocal.app",
+    "productName": "Prontuário local",
+    "asar": false,
+    "directories": {
+      "output": "outputs"
+    },
+    "files": [
+      "server.mjs",
+      "clinical-api.mjs",
+      "gemini-scribe.mjs",
+      "patients-store.mjs",
+      "diagnostico.mjs",
+      "updater.mjs",
+      "electron/**/*",
+      "app/**/*",
+      "build/icon.png",
+      "templates/**/*",
+      "examples/**/*",
+      ".env.example",
+      "node_modules/pdfjs-dist/build/**/*",
+      "node_modules/pdfjs-dist/standard_fonts/**/*",
+      "package.json",
+      "!**/*.test.*"
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Prontuário local"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "WeSISSnipes",
+        "repo": "clinicabittenc-tech-releases"
+      }
+    ]
+  }
+}
