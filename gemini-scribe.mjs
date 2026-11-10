@@ -17,7 +17,7 @@ REGRAS CLÍNICAS OBRIGATÓRIAS:
 1. Use exclusivamente fatos ditos na consulta ou presentes no contexto enviado. Não invente doses, medicamentos, exames ou diagnósticos.
 2. Preserve números, unidades, datas e negações exatamente como falados.
 3. Na transcrição completa ("transcricao"), transcreva TODA a conversa em português do Brasil, separando claramente as falas com horários aproximados no formato [MM:SS] Profissional: ... e [MM:SS] Paciente: ...
-4. Preencha o "bloco" com as seções do prontuário clínico (deixe string vazia "" nas seções que não foram abordadas na consulta; para listas, separe cada item com quebra de linha \\n).
+4. Preencha o "bloco" com as seções do prontuário clínico (deixe string vazia "" nas seções que não foram abordadas na consulta; para listas, separe cada item com quebra de linha \\n). A seção "queixa" NUNCA pode ficar vazia: registre nela o motivo/contexto da conversa ou o resumo do que foi dito.
 5. Preencha o "resumoPaciente" em linguagem acolhedora, clara e direta para a pessoa atendida. NUNCA use a palavra "retorno" em nenhum campo do resumoPaciente — use sempre "consulta", "nova consulta" ou "próxima consulta". Nenhum dos 6 campos de resumoPaciente pode ficar vazio (se não houve exame ou medicação, escreva de forma neutra, ex.: "Nenhuma medicação nova prescrita nesta consulta.").
 6. Preencha "mensagemWhatsapp" com uma mensagem curta e cordial pós-consulta para enviar no WhatsApp.
 
@@ -81,6 +81,9 @@ export function normalizarRespostaGemini(raw) {
     const val = rawBloco[key];
     bloco[key] = Array.isArray(val) ? val.map(v => String(v).trim()).filter(Boolean).join('\n')
       : typeof val === 'string' ? val.trim() : '';
+  }
+  if (!Object.values(bloco).some(Boolean)) {
+    bloco.queixa = resumoClinico || transcricao || 'Atendimento registrado por áudio.';
   }
 
   const rawResumo = parsed.resumoPaciente && typeof parsed.resumoPaciente === 'object' ? parsed.resumoPaciente : {};
