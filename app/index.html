@@ -25,10 +25,12 @@
   </div>
   <div class="actions">
     <span id="scribeGeminiBadge" class="conn-badge warn" role="status">Verificando Gemini…</span>
+    <button id="scribeChooseFolderBtn" type="button" class="secondary" title="Escolher a pasta principal de Pacientes no OneDrive">📂 Trocar Pasta</button>
     <button id="scribeToggleKeyBtn" type="button" class="secondary">Chave Gemini</button>
   </div>
 </div>
-<p style="margin-top: 0;">Escolha o paciente da sua pasta do OneDrive (ou digite um novo), aperte <strong>Iniciar Gravação</strong> e, ao encerrar, o aplicativo transcreve a conversa separando quem falou, monta o prontuário e o resumo pós-consulta e <strong>já salva os arquivos direto na pasta do paciente</strong>.</p>
+<p style="margin-top: 0; margin-bottom: 0.4rem;">Escolha o paciente da sua pasta do OneDrive (ou digite um novo), aperte <strong>Iniciar Gravação</strong> e, ao encerrar, o aplicativo transcreve a conversa separando quem falou, monta o prontuário e o resumo pós-consulta e <strong>já salva os arquivos em <code>&lt;Paciente&gt;\Consultas</code></strong>.</p>
+<p id="scribeActiveFolderInfo" class="evidence" style="margin-top: 0; margin-bottom: 0.75rem;">📂 Pasta ativa: carregando…</p>
 <div id="scribeKeyBox" class="next-steps" hidden style="margin-bottom: 1rem;">
   <div class="grid">
     <label>Chave da API do Google Gemini (<code>AIza...</code> — Google AI Studio)
@@ -137,7 +139,7 @@
 <p>Onde cada consulta salva fica guardada, uma pasta por paciente. Escolha uma pasta privada, fora da pasta do aplicativo. <strong>Sem criptografia nesta versão:</strong> quem tem acesso à pasta lê tudo — inclusive quem tiver acesso à sua conta da nuvem, se a pasta estiver no OneDrive ou no Google Drive.</p>
 <div class="next-steps"><strong>Se a pasta estiver no OneDrive, Google Drive ou similar:</strong> use <strong>um computador por vez</strong>. Feche o aplicativo no outro antes de abrir aqui e espere o ícone de sincronizado antes de fechar o notebook. Se depois de sincronizar uma consulta parecer faltando, procure na pasta do paciente por um arquivo com o nome do outro computador no final: é a outra versão dela.</div>
 <div class="grid"><label>Pasta de dados (caminho completo)<input id="patientsFolderPath" autocomplete="off" placeholder="Windows: C:\ProntuarioLocal\pacientes — Linux: /home/usuario/ProntuarioLocal"></label></div>
-<div class="actions"><button id="setPatientsFolder" class="secondary">Usar esta pasta</button></div>
+<div class="actions"><button id="setPatientsFolder" class="secondary">Usar esta pasta</button><button id="browsePatientsFolderBtn" type="button" class="secondary">📂 Escolher pasta no computador…</button></div>
 <p id="patientsFolderStatus" class="evidence">Verificando…</p>
 <h3>Atualização rápida do aplicativo</h3>
 <p>Verifica e instala melhorias publicadas no GitHub em 1 clique, sem precisar baixar ou extrair arquivos manualmente.</p>

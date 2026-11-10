@@ -260,6 +260,53 @@ export function createGeminiScribeService({
     return Boolean(limpa);
   }
 
+  async function enviarAudioViaFileApi(key, audioBytes, cleanMime) {
+    const uploadUrl = 'https://generativelanguage.googleapis.com/upload/v1beta/files';
+    const upRes = await fetchImpl(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'x-goog-api-key': key,
+        'X-Goog-Upload-Protocol': 'raw',
+        'X-Goog-Upload-Command': 'start, upload, finalize',
+        'X-Goog-Upload-Header-Content-Length': String(audioBytes.length),
+        'X-Goog-Upload-Header-Content-Type': cleanMime,
+        'Content-Type': cleanMime,
+      },
+      signal: AbortSignal.timeout(300000),
+      body: audioBytes,
+    });
+    if (!upRes.ok) {
+      const txt = await upRes.text().catch(() => '');
+      throw Error(`Falha ao enviar áudio longo para o Gemini File API (status ${upRes.status}: ${txt.slice(0, 120)}).`);
+    }
+    const upData = await upRes.json();
+    const fileObj = upData?.file || upData;
+    if (!fileObj?.uri) throw Error('O Gemini File API não retornou o identificador do arquivo de áudio.');
+    // Aguarda caso o áudio longo esteja em estado PROCESSING
+    for (let i = 0; i < 30 && fileObj.state === 'PROCESSING'; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      const stRes = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/${fileObj.name}`, {
+        headers: { 'x-goog-api-key': key },
+      }).catch(() => null);
+      if (stRes?.ok) {
+        const stData = await stRes.json().catch(() => ({}));
+        if (stData.state) fileObj.state = stData.state;
+      }
+    }
+    return fileObj;
+  }
+
+  async function removerAudioFileApi(key, fileName) {
+    if (!fileName) return;
+    try {
+      await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/${fileName}`, {
+        method: 'DELETE',
+        headers: { 'x-goog-api-key': key },
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch { /* ignore */ }
+  }
+
   async function processarConsulta({ audioBase64 = '', mimeType = 'audio/webm', transcricaoTexto = '', contextoExtra = '' } = {}) {
     const key = await chaveAtual();
     if (!key) {
@@ -271,13 +318,28 @@ export function createGeminiScribeService({
 
     const cleanMime = String(mimeType || 'audio/webm').split(';')[0].trim().toLowerCase() || 'audio/webm';
     const parts = [];
+    let arquivoRemoto = null;
     if (audioBase64) {
-      parts.push({
-        inlineData: {
-          mimeType: cleanMime,
-          data: audioBase64,
-        },
-      });
+      // Consultas longas (> ~10 MB em base64, ex. 15 min a 1h30 de consulta) vão via Gemini File API
+      // para nunca estourar o limite de 20 MB do inlineData!
+      if (audioBase64.length > 14_000_000) {
+        const audioBytes = Buffer.from(audioBase64, 'base64');
+        if (depurar) await depurar(`gemini: enviando audio longo via File API (${Math.round(audioBytes.length / 1024 / 1024)} MB)`);
+        arquivoRemoto = await enviarAudioViaFileApi(key, audioBytes, cleanMime);
+        parts.push({
+          fileData: {
+            mimeType: cleanMime,
+            fileUri: arquivoRemoto.uri,
+          },
+        });
+      } else {
+        parts.push({
+          inlineData: {
+            mimeType: cleanMime,
+            data: audioBase64,
+          },
+        });
+      }
     }
     let instrucaoUsuario = 'Transcreva a consulta completa separando os falantes ([MM:SS] Profissional: e [MM:SS] Paciente:) e gere o bloco do prontuário, o resumo ao paciente e a mensagem pós-consulta em JSON.';
     if (transcricaoTexto.trim()) {
@@ -300,7 +362,7 @@ export function createGeminiScribeService({
             'content-type': 'application/json',
             'x-goog-api-key': key,
           },
-          signal: AbortSignal.timeout(300000),
+          signal: AbortSignal.timeout(600000),
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
             contents: [{ role: 'user', parts }],
@@ -311,6 +373,7 @@ export function createGeminiScribeService({
           }),
         });
       } catch (error) {
+        await removerAudioFileApi(key, arquivoRemoto?.name);
         if (depurar) await depurar(`gemini: fetch falhou: ${error.name || ''} ${error.message || ''}`.trim());
         throw Error('Falha de conexão ou tempo esgotado ao comunicar com o Gemini.');
       }
@@ -330,6 +393,8 @@ export function createGeminiScribeService({
       }
       break;
     }
+
+    await removerAudioFileApi(key, arquivoRemoto?.name);
 
     if (!response.ok) {
       if (response.status === 400 && errText.toLowerCase().includes('api_key')) {

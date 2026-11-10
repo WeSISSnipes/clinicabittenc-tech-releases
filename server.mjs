@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import {loadEnvFile} from 'node:process';
 import {createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
+import {spawn} from 'node:child_process';
 import {createClinicalService,validateBase} from './clinical-api.mjs';
 import {createPatientsStore} from './patients-store.mjs';
 import {createGeminiScribeService} from './gemini-scribe.mjs';
@@ -39,6 +40,17 @@ const routes = new Map([
     .map(f => [`/vendor/pdfjs/standard_fonts/${f}`, [`node_modules/pdfjs-dist/standard_fonts/${f}`, 'application/octet-stream']]),
 ]);
 const REPO_ROOT=fileURLToPath(new URL('.',import.meta.url));
+function escolherPastaWindows(pastaInicial=''){
+  return new Promise(resolve=>{
+    if(process.platform!=='win32'){resolve('');return;}
+    const script=`Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Escolha a pasta principal de Pacientes (ex.: OneDrive\\...\\Pacientes)'; $f.ShowNewFolderButton = $true; if (${JSON.stringify(pastaInicial)} -and (Test-Path ${JSON.stringify(pastaInicial)})) { $f.SelectedPath = ${JSON.stringify(pastaInicial)} }; $top = New-Object System.Windows.Forms.Form; $top.TopMost = $true; if ($f.ShowDialog($top) -eq 'OK') { [Console]::Out.Write($f.SelectedPath) }`;
+    const proc=spawn('powershell.exe',['-NoProfile','-STA','-Command',script],{windowsHide:true});
+    let out='';
+    proc.stdout.on('data',d=>{out+=d.toString('utf8');});
+    proc.on('error',()=>resolve(''));
+    proc.on('close',()=>resolve(out.trim()));
+  });
+}
 export function makeServer({clinical=createClinicalService(),gemini=createGeminiScribeService({apiKeyPath:fileURLToPath(new URL('./.env',import.meta.url))}),patients=createPatientsStore({configPath:fileURLToPath(new URL('./dados.config.json',import.meta.url)),repoRoot:REPO_ROOT}),updater=createUpdaterService({appRoot:REPO_ROOT})}={}) {
   const secret=randomBytes(32);
   let active=0;
@@ -53,19 +65,27 @@ export function makeServer({clinical=createClinicalService(),gemini=createGemini
     if(req.url==='/api/pacientes/pastas-referencia'&&req.method==='GET')return json(res,200,{pastas:await patients.listarPastasReferencia()});
     if(req.url?.startsWith('/api/')){
       if(req.method!=='POST'||req.headers.origin!==`http://${req.headers.host}`||req.headers['x-clinical-request']!=='1'||req.headers['content-type']!=='application/json')return json(res,403,{error:'Solicitação local não autorizada.'});
-      const ROTAS_PACIENTES=['/api/pacientes/config','/api/pacientes/listar','/api/pacientes/paciente','/api/pacientes/consultas','/api/pacientes/salvar','/api/pacientes/abrir','/api/pacientes/registrar-nascimento','/api/pacientes/exportar-documentos'];
+      const ROTAS_PACIENTES=['/api/pacientes/config','/api/pacientes/escolher-pasta','/api/pacientes/listar','/api/pacientes/paciente','/api/pacientes/consultas','/api/pacientes/salvar','/api/pacientes/abrir','/api/pacientes/registrar-nascimento','/api/pacientes/exportar-documentos'];
       const ROTAS_SCRIBE=['/api/scribe/key','/api/scribe/verify','/api/scribe/process'];
       const ROTAS_APP=['/api/app/check-update','/api/app/update'];
       if(![...ROTAS_PACIENTES,...ROTAS_SCRIBE,...ROTAS_APP,'/api/synthesize','/api/approve','/api/deliver'].includes(req.url))return json(res,404,{error:'Rota desconhecida.'});
       if(active>=3)return json(res,429,{error:'Há solicitações em andamento. Aguarde.'});
       active++;
       try{
-        // Salvar uma consulta ou enviar áudio gravado em base64 aceita até 40 MB; as demais continuam em 2 MB.
-        const salvando=req.url==='/api/pacientes/salvar'||req.url==='/api/scribe/process'||req.url==='/api/pacientes/exportar-documentos',teto=salvando?40_000_000:2_000_000;
+        // Salvar uma consulta aceita até 40 MB; enviar áudio gravado longo (até 1h30) aceita até 250 MB; as demais continuam em 2 MB.
+        const rotaAudio=req.url==='/api/scribe/process'||req.url==='/api/pacientes/exportar-documentos';
+        const salvando=req.url==='/api/pacientes/salvar';
+        const teto=rotaAudio?250_000_000:salvando?40_000_000:2_000_000;
         let length=0;const chunks=[];
-        for await(const chunk of req){length+=chunk.length;if(length>teto)throw Error(salvando?'Esta consulta é maior que 40 MB e não cabe no histórico. Use "Salvar sessão" para guardá-la em arquivo, ou remova PDFs muito grandes.':'Solicitação maior que o limite de 2 MB.');chunks.push(chunk);}
+        for await(const chunk of req){length+=chunk.length;if(length>teto)throw Error(rotaAudio?'O arquivo de áudio excede 250 MB.':salvando?'Esta consulta é maior que 40 MB e não cabe no histórico. Use "Salvar sessão" para guardá-la em arquivo, ou remova PDFs muito grandes.':'Solicitação maior que o limite de 2 MB.');chunks.push(chunk);}
         let body;try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw Error('Solicitação JSON inválida.');}
         if(req.url==='/api/pacientes/config')return json(res,200,{pasta:await patients.definirPasta(body.pasta)});
+        if(req.url==='/api/pacientes/escolher-pasta'){
+          const atual=(await patients.obterPasta())||'';
+          const escolhida=await escolherPastaWindows(atual);
+          if(!escolhida)return json(res,200,{cancelado:true,pasta:atual});
+          return json(res,200,{cancelado:false,pasta:await patients.definirPasta(escolhida)});
+        }
         if(req.url==='/api/pacientes/listar')return json(res,200,{pacientes:await patients.listarPacientes()});
         if(req.url==='/api/pacientes/paciente')return json(res,200,{paciente:await patients.obterPaciente(body.id)});
         if(req.url==='/api/pacientes/consultas')return json(res,200,{consultas:await patients.listarConsultas(body.id)});

@@ -219,7 +219,7 @@ export function createPatientsStore({ configPath, repoRoot } = {}) {
         }))
         .sort((a, b) => a.nomeExibicao.localeCompare(b.nomeExibicao, 'pt-BR', { sensitivity: 'base' }));
     },
-    async exportarDocumentosPaciente({ nomePaciente, dataConsulta, audioWavBase64 = '', transcricao = '', prontuarioHtml = '', prontuarioMd = '', resumoHtml = '', mensagemWhatsapp = '' }) {
+    async exportarDocumentosPaciente({ nomePaciente, dataConsulta, subpasta = 'Consultas', audioWavBase64 = '', transcricao = '', prontuarioHtml = '', prontuarioMd = '', resumoHtml = '', mensagemWhatsapp = '' }) {
       const base = await obterPasta();
       if (!base) throw Error('Configure a pasta de pacientes (OneDrive) em Ajustes primeiro.');
       const nomeLimpo = String(nomePaciente || '').trim().replace(/[<>:"/\\|?*\x00-\x1F]/g, '').replace(/\.+$/, '').trim();
@@ -231,7 +231,8 @@ export function createPatientsStore({ configPath, repoRoot } = {}) {
       const alvoNorm = norm(nomeLimpo);
       const existente = entradas.find(e => e.isDirectory() && (norm(e.name) === alvoNorm || norm(e.name.replace(/_\d{4}-\d{2}-\d{2}$/, '')) === alvoNorm));
       const nomeDaPasta = existente ? existente.name : nomeLimpo;
-      const pastaPaciente = join(base, nomeDaPasta);
+      const subLimpa = String(subpasta || '').trim().replace(/[<>:"/\\|?*\x00-\x1F.]/g, '').trim();
+      const pastaPaciente = subLimpa ? join(base, nomeDaPasta, subLimpa) : join(base, nomeDaPasta);
       if (!pastaPaciente.startsWith(base + sep)) throw Error('Caminho de pasta inválido.');
       await mkdir(pastaPaciente, { recursive: true });
 

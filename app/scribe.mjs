@@ -32,7 +32,10 @@ function base64ToUint8Array(base64) {
 }
 
 function encodeWavFromAudioBuffer(audioBuffer) {
-  const targetRate = 16000;
+  // Para consultas longas (30 min a 1h30), usa 8kHz ou 12kHz mono (padrão telefonia/voz clínica)
+  // para manter o arquivo .wav leve (~55 MB em 1h) sem perder nitidez de fala!
+  const duracaoSeg = audioBuffer.duration || 0;
+  const targetRate = duracaoSeg > 1800 ? 8000 : duracaoSeg > 900 ? 12000 : 16000;
   const srcRate = audioBuffer.sampleRate;
   const channelData = audioBuffer.getChannelData(0);
   const ratio = srcRate / targetRate;
@@ -117,9 +120,21 @@ export function mountScribe({ $, say, protect, aplicarTranscricaoECampos, templa
 
   async function atualizarPastasDatalist() {
     try {
-      const r = await fetch('/api/pacientes/pastas-referencia');
-      if (!r.ok) return;
-      const { pastas } = await r.json();
+      const [rPastas, rCfg] = await Promise.all([
+        fetch('/api/pacientes/pastas-referencia'),
+        fetch('/api/pacientes/config'),
+      ]);
+      if (rCfg.ok) {
+        const { pasta } = await rCfg.json();
+        const infoEl = $('scribeActiveFolderInfo');
+        if (infoEl) {
+          infoEl.textContent = pasta
+            ? `📂 Pasta ativa: ${pasta} (salvando em <Paciente>\\Consultas)`
+            : '⚠️ Nenhuma pasta de pacientes selecionada. Clique em "📂 Trocar Pasta" acima para escolher sua pasta do OneDrive.';
+        }
+      }
+      if (!rPastas.ok) return;
+      const { pastas } = await rPastas.json();
       const dl = $('scribePatientsDatalist');
       if (!dl) return;
       dl.replaceChildren();
@@ -129,6 +144,27 @@ export function mountScribe({ $, say, protect, aplicarTranscricaoECampos, templa
         dl.append(opt);
       }
     } catch { /* ignore */ }
+  }
+
+  async function escolherPastaNoComputador() {
+    say('Abrindo seletor de pastas do Windows… Escolha a pasta principal "Pacientes" do seu OneDrive.');
+    const r = await fetch('/api/pacientes/escolher-pasta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Clinical-Request': '1' },
+      body: JSON.stringify({}),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw Error(d.error || 'Não foi possível selecionar a pasta.');
+    if (d.cancelado) {
+      say('Seleção de pasta cancelada.');
+      return;
+    }
+    if ($('patientsFolderPath') && d.pasta) {
+      $('patientsFolderPath').value = d.pasta;
+      if ($('setPatientsFolder')) $('setPatientsFolder').click();
+    }
+    await atualizarPastasDatalist();
+    say(`✓ Pasta de pacientes atualizada para: ${d.pasta}`);
   }
 
   async function verificarChaveNoServidor({ forcar = false } = {}) {
@@ -474,11 +510,14 @@ export function mountScribe({ $, say, protect, aplicarTranscricaoECampos, templa
     });
   }
 
+  if ($('scribeChooseFolderBtn')) $('scribeChooseFolderBtn').onclick = protect(escolherPastaNoComputador);
+  if ($('browsePatientsFolderBtn')) $('browsePatientsFolderBtn').onclick = protect(escolherPastaNoComputador);
+
   if ($('scribeAudioFile')) {
     $('scribeAudioFile').onchange = protect(async event => {
       const file = event.target.files?.[0];
       if (!file) return;
-      if (file.size > 28 * 1024 * 1024) throw Error('Arquivo de áudio maior que 28 MB.');
+      if (file.size > 180 * 1024 * 1024) throw Error('Arquivo de áudio maior que 180 MB.');
       const rawMime = file.type || (file.name.endsWith('.mp3') ? 'audio/mpeg' : file.name.endsWith('.wav') ? 'audio/wav' : file.name.endsWith('.m4a') ? 'audio/mp4' : 'audio/webm');
       const convertido = await converterBlobParaWavBase64(file, rawMime);
       ultimoAudioBase64 = convertido.base64;
