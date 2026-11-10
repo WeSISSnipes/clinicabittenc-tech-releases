@@ -147,7 +147,7 @@ export function mountScribe({ $, say, protect, aplicarTranscricaoECampos, templa
     const notice = $('scribeKeyVerifyNotice');
     if (badge) {
       if (valid) {
-        badge.textContent = `✓ Gemini verificado · ${model || 'gemini-2.5-flash'}`;
+        badge.textContent = `✓ Gemini verificado · ${model || 'gemini-3.8-flash'}`;
         badge.className = 'conn-badge ok';
       } else if (configured) {
         badge.textContent = '❌ Chave Gemini inválida';
@@ -342,7 +342,7 @@ export function mountScribe({ $, say, protect, aplicarTranscricaoECampos, templa
     if (statusBox) {
       statusBox.hidden = false;
       statusBox.className = 'next-steps';
-      statusBox.textContent = '⏳ O Gemini 2.5 Flash está ouvindo a consulta, separando Profissional e Paciente e montando o Prontuário + Pós-Consulta…';
+      statusBox.textContent = '⏳ O Gemini Flash está ouvindo a consulta, separando Profissional e Paciente e montando o Prontuário + Pós-Consulta…';
     }
     say('Processando áudio no Gemini Flash… Aguarde alguns instantes.');
 

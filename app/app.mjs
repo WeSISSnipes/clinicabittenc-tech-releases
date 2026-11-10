@@ -895,8 +895,8 @@ function preencherProvedores(){
   const salva=lerConfigSalva();
   if(salva?.provedor){
     seletor.value=salva.provedor;aplicar();
-    if(typeof salva.endpoint==='string')$('aiEndpoint').value=salva.endpoint;
-    if(typeof salva.modelo==='string')$('aiModel').value=salva.modelo;
+    if(typeof salva.endpoint==='string'&&!salva.endpoint.includes('gemini-2.5-flash'))$('aiEndpoint').value=salva.endpoint;
+    if(typeof salva.modelo==='string'&&salva.modelo!=='gemini-2.5-flash')$('aiModel').value=salva.modelo;
     if(typeof salva.chave==='string')$('aiKey').value=salva.chave;
     if(typeof salva.pdfOk==='boolean'&&!$('aiPdfOk').disabled)$('aiPdfOk').checked=salva.pdfOk;
     mostrarDestino();

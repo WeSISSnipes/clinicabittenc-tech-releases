@@ -7,7 +7,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { BLOCK_SECTIONS } from './app/bloco.mjs';
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
+const MODELOS_CANDIDATOS = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
 
 const SYSTEM_PROMPT = `Você é um assistente de documentação clínica em português do Brasil para consultas médicas (endocrinologia/metabologia) e de nutrição.
 Você receberá o áudio de uma consulta (ou uma transcrição já existente) onde há pelo menos duas pessoas conversando: o Profissional (Médico(a) ou Nutricionista) e o(a) Paciente.
@@ -116,8 +117,13 @@ export function createGeminiScribeService({
   depurar = null,
 } = {}) {
   let chaveEmMemoria = apiKey;
+  let modeloAtivo = model;
   let ultimaChaveValidada = '';
   let ultimoResultadoValidacao = null;
+
+  function listaModelosParaTentar() {
+    return [...new Set([modeloAtivo, ...MODELOS_CANDIDATOS])];
+  }
 
   async function chaveAtual() {
     if (obterChave) {
@@ -144,69 +150,83 @@ export function createGeminiScribeService({
   async function validarChave(chaveOpcional, { forcar = false } = {}) {
     const key = String(chaveOpcional !== undefined ? chaveOpcional : await chaveAtual()).trim();
     if (!key) {
-      return { valid: false, configured: false, model, error: 'Chave do Gemini ainda não configurada.' };
+      return { valid: false, configured: false, model: modeloAtivo, error: 'Chave do Gemini ainda não configurada.' };
     }
     if (!forcar && ultimaChaveValidada === key && ultimoResultadoValidacao) {
       return ultimoResultadoValidacao;
     }
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-    try {
-      const response = await fetchImpl(url, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-goog-api-key': key,
-        },
-        signal: AbortSignal.timeout(12000),
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: 'ok' }] }],
-          generationConfig: { maxOutputTokens: 2 },
-        }),
-      });
-      if (!response.ok) {
-        const errText = await response.text().catch(() => '');
-        let apiMsg = '';
-        try { apiMsg = JSON.parse(errText)?.error?.message || ''; } catch { /* ignore */ }
-        if (depurar) await depurar(`gemini: validacao falhou status=${response.status} msg=${apiMsg.slice(0, 100)}`);
-        if (response.status === 400 || response.status === 401 || response.status === 403) {
-          const res = {
-            valid: false,
-            configured: true,
-            model,
-            error: 'Chave do Gemini inválida ou recusada pelo Google AI Studio. Gere/copie uma chave válida (AIza...) antes de iniciar a consulta.',
-          };
-          ultimaChaveValidada = key;
-          ultimoResultadoValidacao = res;
-          return res;
+    let ultimoErroStatus = 0;
+    let ultimaMsgApi = '';
+    for (const candidato of listaModelosParaTentar()) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(candidato)}:generateContent`;
+      try {
+        const response = await fetchImpl(url, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-goog-api-key': key,
+          },
+          signal: AbortSignal.timeout(12000),
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: 'ok' }] }],
+            generationConfig: { maxOutputTokens: 2 },
+          }),
+        });
+        if (!response.ok) {
+          const errText = await response.text().catch(() => '');
+          let apiMsg = '';
+          try { apiMsg = JSON.parse(errText)?.error?.message || ''; } catch { /* ignore */ }
+          ultimoErroStatus = response.status;
+          ultimaMsgApi = apiMsg;
+          if (depurar) await depurar(`gemini: validacao (${candidato}) status=${response.status} msg=${apiMsg.slice(0, 100)}`);
+          // Se este modelo retornou 404 (descontinuado para novos usuários), tenta automaticamente o próximo modelo candidato!
+          if (response.status === 404) {
+            const sugerido = /models\/([\w.-]+flash[\w.-]*)/i.exec(apiMsg)?.[1];
+            if (sugerido && !MODELOS_CANDIDATOS.includes(sugerido)) MODELOS_CANDIDATOS.unshift(sugerido);
+            continue;
+          }
+          if (response.status === 400 || response.status === 401 || response.status === 403) {
+            const res = {
+              valid: false,
+              configured: true,
+              model: modeloAtivo,
+              error: 'Chave do Gemini inválida ou recusada pelo Google AI Studio. Gere/copie uma chave válida (AIza...) antes de iniciar a consulta.',
+            };
+            ultimaChaveValidada = key;
+            ultimoResultadoValidacao = res;
+            return res;
+          }
+          if (response.status === 429) {
+            modeloAtivo = candidato;
+            const res = { valid: true, configured: true, model: modeloAtivo };
+            ultimaChaveValidada = key;
+            ultimoResultadoValidacao = res;
+            return res;
+          }
+          continue;
         }
-        if (response.status === 429) {
-          // Chave existe e autenticou, apenas limite momentâneo
-          const res = { valid: true, configured: true, model };
-          ultimaChaveValidada = key;
-          ultimoResultadoValidacao = res;
-          return res;
-        }
+        modeloAtivo = candidato;
+        const res = { valid: true, configured: true, model: modeloAtivo };
+        ultimaChaveValidada = key;
+        ultimoResultadoValidacao = res;
+        return res;
+      } catch (error) {
+        if (depurar) await depurar(`gemini: erro de rede ao validar chave: ${error.message || ''}`);
         return {
           valid: false,
           configured: true,
-          model,
-          error: `Não foi possível validar a chave no Gemini (status ${response.status}${apiMsg ? `: ${apiMsg}` : ''}).`,
+          networkError: true,
+          model: modeloAtivo,
+          error: 'Sem conexão com a internet para validar a chave do Gemini no momento.',
         };
       }
-      const res = { valid: true, configured: true, model };
-      ultimaChaveValidada = key;
-      ultimoResultadoValidacao = res;
-      return res;
-    } catch (error) {
-      if (depurar) await depurar(`gemini: erro de rede ao validar chave: ${error.message || ''}`);
-      return {
-        valid: false,
-        configured: true,
-        networkError: true,
-        model,
-        error: 'Sem conexão com a internet para validar a chave do Gemini no momento.',
-      };
     }
+    return {
+      valid: false,
+      configured: true,
+      model: modeloAtivo,
+      error: `Não foi possível validar o modelo no Gemini (status ${ultimoErroStatus}${ultimaMsgApi ? `: ${ultimaMsgApi}` : ''}).`,
+    };
   }
 
   async function definirChave(novaChave) {
@@ -265,35 +285,50 @@ export function createGeminiScribeService({
     }
     parts.push({ text: instrucaoUsuario });
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     let response;
-    try {
-      response = await fetchImpl(url, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-goog-api-key': key,
-        },
-        signal: AbortSignal.timeout(300000),
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{ role: 'user', parts }],
-          generationConfig: {
-            temperature: 0.2,
-            responseMimeType: 'application/json',
+    let errText = '';
+    let apiMsg = '';
+    for (const candidato of listaModelosParaTentar()) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(candidato)}:generateContent`;
+      try {
+        response = await fetchImpl(url, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-goog-api-key': key,
           },
-        }),
-      });
-    } catch (error) {
-      if (depurar) await depurar(`gemini: fetch falhou: ${error.name || ''} ${error.message || ''}`.trim());
-      throw Error('Falha de conexão ou tempo esgotado ao comunicar com o Gemini.');
+          signal: AbortSignal.timeout(300000),
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents: [{ role: 'user', parts }],
+            generationConfig: {
+              temperature: 0.2,
+              responseMimeType: 'application/json',
+            },
+          }),
+        });
+      } catch (error) {
+        if (depurar) await depurar(`gemini: fetch falhou: ${error.name || ''} ${error.message || ''}`.trim());
+        throw Error('Falha de conexão ou tempo esgotado ao comunicar com o Gemini.');
+      }
+
+      if (response.ok) {
+        modeloAtivo = candidato;
+        break;
+      }
+      errText = await response.text().catch(() => '');
+      apiMsg = '';
+      try { apiMsg = JSON.parse(errText)?.error?.message || ''; } catch { /* ignore */ }
+      if (depurar) await depurar(`gemini (${candidato}): status=${response.status} len=${errText.length} msg=${apiMsg.slice(0, 120)}`);
+      if (response.status === 404) {
+        const sugerido = /models\/([\w.-]+flash[\w.-]*)/i.exec(apiMsg)?.[1];
+        if (sugerido && !MODELOS_CANDIDATOS.includes(sugerido)) MODELOS_CANDIDATOS.unshift(sugerido);
+        continue;
+      }
+      break;
     }
 
     if (!response.ok) {
-      const errText = await response.text().catch(() => '');
-      let apiMsg = '';
-      try { apiMsg = JSON.parse(errText)?.error?.message || ''; } catch { /* ignore */ }
-      if (depurar) await depurar(`gemini: status=${response.status} len=${errText.length} msg=${apiMsg.slice(0, 120)}`);
       if (response.status === 400 && errText.toLowerCase().includes('api_key')) {
         throw Error('Chave do Gemini inválida. Confira a chave no Google AI Studio.');
       }
@@ -318,7 +353,7 @@ export function createGeminiScribeService({
   }
 
   return {
-    model,
+    get model() { return modeloAtivo; },
     async estaConfigurado() { return Boolean(await chaveAtual()); },
     validarChave,
     definirChave,

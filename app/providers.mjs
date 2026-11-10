@@ -5,10 +5,10 @@ export const PROVIDERS = Object.freeze({
   gemini: {
     id: 'gemini',
     label: 'Google Gemini (Flash / Pro — Recomendado)',
-    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
     sufixo: '',
     versao: '',
-    modeloPadrao: 'gemini-2.5-flash',
+    modeloPadrao: 'gemini-3.8-flash',
     aceitaPdfPadrao: true,
     chaveAnthropic: false,
     headers: chave => ({
